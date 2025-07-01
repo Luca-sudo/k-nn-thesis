@@ -1,3 +1,18 @@
+#+title: Test LSH & HNSW
+
+This script forms the backbone for comparing the quality of HNSW and LSH on instances.
+It receives a filepath to the instance data as its sole argument.
+Then, it reads the file and processes it.
+Before we can do this, we first have to import any necessary library. To this end we use:
+- Matplotlib to generate graphs of the benchmark-data
+- Csv to write the benchmark data to a csv file
+- sys to extract CLI arguments -- in this case the path to the data
+- time to measure index creation and query times
+- numpy to work with arrays
+- h5py to read previously generated data
+- faiss to create HNSW and LSH indexes.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import csv
@@ -6,12 +21,20 @@ import time
 import numpy as np
 import h5py
 import faiss
+#+end_src
 
+With all libraries in place, we have to extract the filepath to the data from the CLI.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to compare!")
 
 filepath = sys.argv[1]
+#+end_src
 
+We then read the first parameters of the test data -- such as the number of instances, description and $k$ for nearest neighbour queries -- before printing an explanation of the hypothesis this data examines as well as a natural language description of the data.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 file = h5py.File(filepath, 'r')
 k = file.attrs['k'].item()
 n_instances = file.attrs['n_instances']
@@ -20,7 +43,11 @@ hypothesis = file.attrs['hypothesis']
 
 print(f'Hypothesis: {hypothesis}')
 print(f'Description: {description}')
+#+end_src
 
+Before testing each instance, we setup lists for all data that we are interested in. We initialize these lists with a short, descriptive string; this lets us write the data to a .csv file descriptively later on.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 data_extraction = ["Data extraction in seconds"]
 hnsw_creation = ["Creation of HNSW index in seconds"]
 hnsw_querying = ["Querying of HNSW index in seconds"]
@@ -32,7 +59,11 @@ hnsw_max = ["HNSW Max Quality"]
 lsh_min = ["LSH Min Quality"]
 lsh_median = ["LSH Median Quality"]
 lsh_max = ["LSH Max Quality"]
+#+end_src
 
+Finally, we begin evaluating all instances. For this we extract the data, which includes the dimensionality, amount of sites, optimal solutions to the k-nearest neighbour query, etc.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 for i in range(n_instances):
     print(f'Extracting instance {i}.')
     time_start = time.perf_counter()
@@ -47,7 +78,11 @@ for i in range(n_instances):
     dt = round(time_end - time_start, 7)
     data_extraction.append(dt)
     print(f'\tExtracting data: \t{dt:.3f} seconds')
+#+end_src
 
+With the instance data at hand, we now create the HNSW index and time it.
+
+#+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
     hnsw_index = faiss.IndexHNSWFlat(n_dim, 4)
     hnsw_index.hnsw.efConstruction = 200
@@ -56,14 +91,22 @@ for i in range(n_instances):
     dt = round(time_end - time_start, 7)
     hnsw_creation.append(dt)
     print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
+#+end_src
 
+We then query this HNSW index.
+
+#+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
     hnsw_distance, queried_solution = hnsw_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     hnsw_creation.append(dt)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+#+end_src
 
+Afterwards, we create the LSH index and query it too.
+
+#+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
     lsh_index = faiss.IndexLSH(n_dim, 2 * n_dim)
     lsh_index.add(sites)
@@ -78,16 +121,29 @@ for i in range(n_instances):
     dt = round(time_end - time_start, 7)
     hnsw_creation.append(dt)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+#+end_src
 
+Before we can evaluate the quality of the LSH index, we have to calculate the distances for candidate solutions manually. While the HNSW index returned euclidean distances together with the set of candidate solutions, LSH returns the hamming distance instead. We, therefore, calculate the euclidean distances for all LSH candidate solutions.
+
+#+begin_src python :tangle test_lsh_hnsw.py
     solution_vectors = sites[lsh_solutions]
     lsh_distance = np.sum((solution_vectors[0] - query) ** 2, axis=1)
+#+end_src
 
+Next, we sort the resulting distances of both HNSW and LSH from best to worst, before we calculate the quality of the respective solutions. We define the quality of a candidate solution relative to the optimal solution through the formula $\frac{\text{Optimal Distance}}{\text{Achieved Distance}}$. Hence, the quality of a candidate is $1$ if it is precisely the optimal solution. In any other case, the quality approaches zero as the realized distance worsens.
+
+#+begin_src python :tangle test_lsh_hnsw.py
     sorted_lsh_distances = sorted(lsh_distance)
     sorted_hnsw_distances = sorted(hnsw_distance[0])
 
     lsh_quality = optimal_distances[0] / sorted_lsh_distances
     hnsw_quality = optimal_distances[0] / sorted_hnsw_distances
+#+end_src
 
+Finally, we print and store the values of interest: minimum, median and maximum quality for both HNSW and LSH.
+
+
+#+begin_src python :tangle test_lsh_hnsw.py
     print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
     print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
 
@@ -97,7 +153,11 @@ for i in range(n_instances):
     lsh_median.append(lsh_quality[1])
     hnsw_max.append(max(hnsw_quality))
     lsh_max.append(max(lsh_quality))
+#+end_src
 
+:TODO: Add section on csv and plot generation.
+
+#+begin_src python :tangle test_lsh_hnsw.py
 rows = zip(data_extraction, hnsw_creation, hnsw_querying, lsh_creation, lsh_querying, hnsw_min, hnsw_median, hnsw_max, lsh_min, lsh_median, lsh_max)
 
 csv_path = filepath + ".csv"
@@ -124,3 +184,4 @@ p3.set_xscale('log', base=2)
 
 
 plt.show()
+#+end_src
