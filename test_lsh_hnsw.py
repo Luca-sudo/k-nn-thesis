@@ -39,6 +39,7 @@ for i in range(n_instances):
     dataset = file['instance_' + str(i)]
     n_dim = dataset.attrs['n_dims'].item()
     n_sites = dataset.attrs['n_sites']
+    n_planes = dataset.attrs['n_planes'].item()
     sites = dataset[()]
     optimal_distances = file['distance_' + str(i)][()]
     query = file['query_' + str(i)][()]
@@ -65,7 +66,7 @@ for i in range(n_instances):
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
 
     time_start = time.perf_counter()
-    lsh_index = faiss.IndexLSH(n_dim, 2 * n_dim)
+    lsh_index = faiss.IndexLSH(n_dim, n_planes)
     lsh_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)

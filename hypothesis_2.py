@@ -59,6 +59,7 @@ for i in range(len(spreads)):
     instance = file.create_dataset('instance_' + str(i), data=sites)
     instance.attrs['n_sites'] = n_sites
     instance.attrs['n_dims'] = n_dims
+    instance.attrs['n_planes'] = n_dims * 2
     file.create_dataset('query_' + str(i), data=query)
     file.create_dataset('solution_' + str(i), data=solution)
     file.create_dataset('distance_' + str(i), data=distance)
