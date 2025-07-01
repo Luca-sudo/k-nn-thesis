@@ -17,7 +17,7 @@ data/hypothesis_%: hypothesis_%.py
 	@mkdir -p data
 	python3 $^
 
-evaluate_hypothesis_%: data/hypothesis_% test_hypothesis_%.py
+evaluate_hypothesis_%: data/hypothesis_%
 	@mkdir -p evaluation
 	python3 test_lsh_hnsw.py $<
 
