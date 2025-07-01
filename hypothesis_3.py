@@ -12,11 +12,20 @@ k = 5
 extents = [5, 10, 20, 30, 40, 50, 75, 100, 200, 300, 500]
 filepath = "data/hypothesis_3"
 
+hypothesis = "HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions."
+
+description = """
+This test generates a two-dimensional lattice with fixed extents.
+To this extent, all sites have the form $(i, j)$ with $i, j \in \mathbb{N}$ and $i, j \leq \\text{extent}$.
+"""
+
 np.random.seed(42)
 
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
 file.attrs['n_instances'] = len(extents)
+file.attrs['description'] = description
+file.attrs['hypothesis'] = hypothesis
 
 for i in range(len(extents)):
     print(f'Generating instance {i}:')
