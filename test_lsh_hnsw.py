@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import matplotlib.pyplot as plt
 import csv
 import sys
 import time
@@ -49,7 +50,7 @@ for i in range(n_instances):
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
     time_start = time.perf_counter()
-    hnsw_index = faiss.IndexHNSWFlat(n_dim, 16)
+    hnsw_index = faiss.IndexHNSWFlat(n_dim, 4)
     hnsw_index.hnsw.efConstruction = 200
     hnsw_index.add(sites)
     time_end = time.perf_counter()
@@ -80,16 +81,22 @@ for i in range(n_instances):
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
 
     solution_vectors = sites[lsh_solutions]
-    lsh_distance = np.round(np.sum((solution_vectors[0] - query) ** 2, axis=1), decimals=7)
+    lsh_distance = np.sum((solution_vectors[0] - query) ** 2, axis=1)
 
-    lsh_quality = np.round(optimal_distances / lsh_distance, decimals=7)
-    hnsw_quality = optimal_distances / hnsw_distance
+    sorted_lsh_distances = sorted(lsh_distance)
+    sorted_hnsw_distances = sorted(hnsw_distance[0])
 
-    lsh_quality = sorted(lsh_quality[0], reverse=True)
-    hnsw_quality = sorted(hnsw_quality[0], reverse=True)
+    lsh_quality = optimal_distances[0] / sorted_lsh_distances
+    hnsw_quality = optimal_distances[0] / sorted_hnsw_distances
 
-    print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), round(sum(lsh_quality)/k, 7), max(lsh_quality))
-    print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), round(sum(hnsw_quality)/k, 7), max(hnsw_quality))
+    # print('LSH Quality: ', lsh_quality)
+    # print('HNSW Quality: ', hnsw_quality)
+
+    lsh_quality = sorted(lsh_quality, reverse=True)
+    hnsw_quality = sorted(hnsw_quality, reverse=True)
+
+    print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
+    print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
 
     hnsw_min.append(min(hnsw_quality))
     lsh_min.append(min(lsh_quality))
@@ -106,3 +113,22 @@ csv_path = filepath + ".csv"
 with open(csv_path, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerows(rows)
+
+helper = [2**i for i in range(n_instances)]
+
+fig, (p1, p2, p3) = plt.subplots(1, 3)
+
+p1.set_title('Minimum Quality')
+p1.plot(helper, lsh_min[1:], 'b', helper, hnsw_min[1:], 'g')
+p1.set_xscale('log', base=2)
+
+p2.set_title('Median Quality')
+p2.plot(helper, lsh_median[1:], 'b', helper, hnsw_median[1:], 'g')
+p2.set_xscale('log', base=2)
+
+p3.set_title('Maximum Quality')
+p3.plot(helper, lsh_max[1:], 'b', helper, hnsw_max[1:], 'g')
+p3.set_xscale('log', base=2)
+
+
+plt.show()
