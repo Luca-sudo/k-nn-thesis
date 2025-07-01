@@ -28,6 +28,7 @@ file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
 
 for i in range(len(extents)):
+
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     sites = [(x,y) for x in range(extents[i]) for y in range(extents[i])]
