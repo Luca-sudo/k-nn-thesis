@@ -103,4 +103,101 @@ Finally, we write all the instance data to file under the dataset instance_i. Th
     file.create_dataset('distance_' + str(i), data=distance)
 #+end_src
 
-The test data can be generated with the associated Makefile, too. Run `make generate_hypothesis_1` for that.
+The test data can be generated with the associated Makefile, too. Run `make data/hypothesis_1` for that.
+
+* Hypothesis 2
+
+Conjecture: Given two clusters in the upper-right quadrant of cartesian space, HNSW's quality remains steady and LSH's quality improves as the distance between the two clusters grows. The distance between clusters directly corresponds to the spread of the underlying distribution -- some pairs of points remain infinitesimally close to each other, while the distance between points of separate clusters is directly affected by the distance between the two clusters.
+
+Method of evaluation: All generated instances exhibit the same number of overall sites, distributed equally aross both clusters. The only parameter that changes between instances is the distance between the center points of both clusters. This distance increases exponentially, given by the formula $2^i$ for instance $i$.
+
+We begin with the usual preamble, importin modules, declaring target filepaths for to-be-generated data, etc.
+
+#+begin_src python :tangle hypothesis_2.py
+#!/usr/bin/env python3
+
+# Hypothesis 2: HNSW quality remains steady while LSH quality improves with increased spread (due to higher cosine similarity).
+
+import time
+import numpy as np
+import h5py
+import faiss
+
+filepath = "data/hypothesis_2"
+
+hypothesis = "HNSW quality remains steady while LSH quality increases with growing spread."
+
+description = """
+This test generates two clusters in the upper-right quadrant of the coordinate system.
+The center points of the clusters are chosen to be $-spread / 2.0$ and $spread / 2.0$ respectively.
+Both clusters allow for points within -0.2 and 0.2 range across all axes.
+"""
+
+np.random.seed(42)
+
+n_sites = 100000
+n_dims = 100
+k = 5
+#+end_src
+
+Finally, we define a list of spreads, which correspond to the aforementioned distance between the centers cluster points.
+
+#+begin_src python :tangle hypothesis_2.py
+# This includes spreads up until (and including) $2^{20}$.
+spreads = [2.0 ** i for i in range(21)]
+#+end_src
+
+We then write attributes shared across all instances to the file and begin generating data for each instance.
+
+#+begin_src python :tangle hypothesis_2.py
+file = h5py.File(filepath, 'w')
+file.attrs['k'] = k
+file.attrs['n_instances'] = len(spreads)
+file.attrs['hypothesis'] = hypothesis
+file.attrs['description'] = description
+
+for i in range(len(spreads)):
+#+end_src
+
+The first cluster is centered at $-2^{i-1}$, while the second cluster is centered at $2^{i - 1}$. Within each cluster, the sites are sampled uniformly, akin to the first hypothesis. Each clusters forms a hypoercube of diameter $0.4$. Our entire set of sites is made up of the first cluster and the second cluster.
+
+#+begin_src python :tangle hypothesis_2.py
+    print(f'Generating instance {i}:')
+    time_start = time.perf_counter()
+    first_center = -(spreads[i] / 2.0)
+    second_center = (spreads[i] / 2.0)
+    first_cluster = np.random.uniform(first_center - 0.2, first_center + 0.2, (int(n_sites / 2), n_dims)) - 0.7
+    second_cluster = np.random.uniform(second_center - 0.2, second_center + 0.2, (int(n_sites / 2), n_dims)) + 0.3
+    sites = first_cluster + second_cluster
+    time_end = time.perf_counter()
+    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
+#+end_src
+
+The query to benchmark is drawn uniformly too, but it samples coordinate values between $-2^{i-1}$ and $2^{i-1}$. This ensures that the query lies between both clusters and not inside one of them.
+
+#+begin_src python :tangle hypothesis_2.py
+    query = np.random.uniform(first_center, second_center, (1, n_dims))
+#+end_src
+
+Finally, we create a flat index for exhaustive search, add the sites and compute the optimal k-nearest neighbors. All of which is stored in the file, before we move on to the next instance and repeat.
+
+#+begin_src python :tangle hypothesis_2.py
+    time_start = time.perf_counter()
+    index = faiss.IndexFlatL2(n_dims)
+    index.add(sites)
+    time_end = time.perf_counter()
+    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
+    time_start = time.perf_counter()
+    distance, solution = index.search(query, k)
+    time_end = time.perf_counter()
+    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
+
+    instance = file.create_dataset('instance_' + str(i), data=sites)
+    instance.attrs['n_sites'] = n_sites
+    instance.attrs['n_dims'] = n_dims
+    file.create_dataset('query_' + str(i), data=query)
+    file.create_dataset('solution_' + str(i), data=solution)
+    file.create_dataset('distance_' + str(i), data=distance)
+#+end_src
+
+The data can be generated using `make data/hypothesis_2`.

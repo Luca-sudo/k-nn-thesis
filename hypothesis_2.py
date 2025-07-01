@@ -7,10 +7,6 @@ import numpy as np
 import h5py
 import faiss
 
-n_sites = 100000
-n_dims = 100
-k = 5
-spreads = [2.0, 2.0 ** 1, 2.0 ** 2, 2.0 ** 3, 2.0 ** 4, 2.0 ** 5, 2.0 ** 6, 2.0 ** 7, 2.0 ** 8, 2.0 ** 9, 2.0 ** 10, 2.0 ** 11, 2.0 ** 12, 2.0 ** 13, 2.0 ** 14, 2.0 ** 15, 2.0 ** 16, 2.0 ** 17, 2.0 ** 18, 2.0 ** 19, 2.0 ** 20]
 filepath = "data/hypothesis_2"
 
 hypothesis = "HNSW quality remains steady while LSH quality increases with growing spread."
@@ -23,6 +19,13 @@ Both clusters allow for points within -0.2 and 0.2 range across all axes.
 
 np.random.seed(42)
 
+n_sites = 100000
+n_dims = 100
+k = 5
+
+# This includes spreads up until (and including) $2^{20}$.
+spreads = [2.0 ** i for i in range(21)]
+
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
 file.attrs['n_instances'] = len(spreads)
@@ -30,6 +33,7 @@ file.attrs['hypothesis'] = hypothesis
 file.attrs['description'] = description
 
 for i in range(len(spreads)):
+
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     first_center = -(spreads[i] / 2.0)
@@ -39,7 +43,9 @@ for i in range(len(spreads)):
     sites = first_cluster + second_cluster
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
+
     query = np.random.uniform(first_center, second_center, (1, n_dims))
+
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims)
     index.add(sites)
