@@ -4,7 +4,7 @@
 # @file
 # @version 0.1
 
-.PHONY: clean evaluate_hypothesis_%
+.PHONY: clean
 
 result/%: data/%
 	mkdir -p result

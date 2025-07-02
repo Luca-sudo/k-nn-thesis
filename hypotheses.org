@@ -1,5 +1,6 @@
 #+title: Hypotheses
 
+
 * Hypothesis 1
 
 Conjecture: HNSW remains more precise than LSH on clustered data as the number of sites grows.
@@ -30,7 +31,6 @@ hypothesis = "HNSW remains more precise than LSH on clustered data as the number
 
 description = '''
 We generate two clusters, centered at $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.5)$ respectively. These are hypercubes with a diameter of $0.4$. Put differently, for all sites $s = (s_1, \dots, s_d)$ in the first cluster, it holds that $-0.7 \leq s_i \leq -0.3$. For the second cluster this corresponds to $0.3 \leq s_i \leq 0.7$. Note that sites within each cluster are sampled uniformly.
-
 '''
 #+end_src
 
@@ -87,12 +87,35 @@ Afterwards, we generate the flat index -- that is, an index that linearly scans 
     time_end = time.perf_counter()
     print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
     time_start = time.perf_counter()
-    distance, solution = index.search(query, k)
+    distance, solution = index.search(query, int(n_sites[i]))
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 #+end_src
 
-Finally, we write all the instance data to file under the dataset instance_i. This includes the number of sites generated, the dimensionality of the feature space, the query, as well as the solution.
+Finally, we write all the instance data to file under the dataset instance_i. This includes the number of sites generated, the dimensionality of the feature space, the query, as well as the solution. Note that we computed the exact ordering of all sites with respect to the nearest neighbor query. In order to determine, for a given sites $s$, what neighbor it is to the query, one needs to search the `ordered_sites_i` list.
+
+Note that we materialize the three different views into the solution list, since supplying `file.create_dataset(..., data = solution[0][:k])` evaluates to the raw pointer, storing the solution list itself.
+
+#+begin_src python :tangle hypothesis_1.py
+    k_nearest = solution[0][:k]
+    ordered_sites = solution[0]
+    k_nearest_distances = distance[0][:k]
+#+end_src
+
+In order to accelerate determination of the neighbor ordering $i$ of a site $s$, we invert the role of indices and values in the `ordered_sites` list. Then, indexing into this list with the appropriate site $s$, which is merely an id, yields the desired $i$ in constant time. Otherwise, the list would need to be searched for the site $s$, drastically decreasing speed.
+
+#+begin_src python :tangle hypothesis_1.py
+    def invert(l):
+        new_l = [0 for i in range(len(l))]
+
+        for index, value in enumerate(l):
+            new_l[value] = index
+
+        return new_l
+
+    ordered_sites = invert(ordered_sites)
+#+end_src
+
 
 #+begin_src python :tangle hypothesis_1.py
     instance = file.create_dataset('instance_' + str(i), data=sites)
@@ -100,8 +123,9 @@ Finally, we write all the instance data to file under the dataset instance_i. Th
     instance.attrs['n_dims'] = n_dims[i]
     instance.attrs['n_planes'] = n_dims[i] * 2
     file.create_dataset('query_' + str(i), data=query)
-    file.create_dataset('solution_' + str(i), data=solution)
-    file.create_dataset('distance_' + str(i), data=distance)
+    file.create_dataset('solution_' + str(i), data=k_nearest)
+    file.create_dataset('ordered_sites_' + str(i), data = ordered_sites)
+    file.create_dataset('distance_' + str(i), data=k_nearest_distances)
 #+end_src
 
 The test data can be generated with the associated Makefile, too. Run `make data/hypothesis_1` for that.
@@ -322,12 +346,12 @@ for i in range(len(n_planes)):
 
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
-    sites = [(x,y) for x in range(extent) for y in range(extents)]
+    sites = [(x,y) for x in range(extent) for y in range(extent)]
     sites = np.array(sites, dtype=np.float32)
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
 
-    query = np.random.uniform(0, extents, (1, n_dims))
+    query = np.random.uniform(0, extent, (1, n_dims))
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims)
     index.add(sites)
@@ -340,9 +364,143 @@ for i in range(len(n_planes)):
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
     instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = extents[i] ** 2
+    instance.attrs['n_sites'] = extent ** 2
     instance.attrs['n_dims'] = n_dims
     instance.attrs['n_planes'] = n_planes[i]
+    file.create_dataset('query_' + str(i), data=query)
+    file.create_dataset('solution_' + str(i), data=solution)
+    file.create_dataset('distance_' + str(i), data=distance)
+#+end_src
+
+* Hypothesis 5
+
+Hypothesis: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
+
+Method of evaluation: Successive instances share the extent of the bounded region inhabited by the set of sites. However, the dimensionality increments for successive instances.
+
+Note that this hypothesis requires the library `itertools` in order to generate all sites of the uniform grid for variable dimensions.
+
+#+begin_src python :tangle hypothesis_5.py
+#!/usr/bin/env python3
+
+# Hypothesis 5: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
+
+import itertools
+import time
+import numpy as np
+import h5py
+import faiss
+
+n_dims = [i for i in range(2, 20)]
+k = 5
+extent = 5
+filepath = "data/hypothesis_5"
+
+hypothesis = "Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases."
+
+description = """
+Consider a uniform grid, akin to hypothesis 3 & 4, but this time the extent is fixed and the dimensionality increase for successive instances.
+"""
+
+np.random.seed(42)
+
+file = h5py.File(filepath, 'w')
+file.attrs['k'] = k
+file.attrs['n_instances'] = len(n_dims)
+file.attrs['description'] = description
+file.attrs['hypothesis'] = hypothesis
+
+for i in range(len(n_dims)):
+
+    print(f'Generating instance {i}:')
+    time_start = time.perf_counter()
+    sites = [s for s in itertools.product(range(extent), repeat=n_dims[i])]
+    sites = np.array(sites, dtype=np.float32)
+    time_end = time.perf_counter()
+    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
+
+    query = np.random.uniform(0, extent, (1, n_dims[i]))
+    time_start = time.perf_counter()
+    index = faiss.IndexFlatL2(n_dims[i])
+    index.add(sites)
+    time_end = time.perf_counter()
+    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
+
+    time_start = time.perf_counter()
+    distance, solution = index.search(query, k)
+    time_end = time.perf_counter()
+    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
+
+    instance = file.create_dataset('instance_' + str(i), data=sites)
+    instance.attrs['n_sites'] = extent ** 2
+    instance.attrs['n_dims'] = n_dims[i]
+    instance.attrs['n_planes'] = n_dims[i] * 2
+    file.create_dataset('query_' + str(i), data=query)
+    file.create_dataset('solution_' + str(i), data=solution)
+    file.create_dataset('distance_' + str(i), data=distance)
+#+end_src
+
+* Hypothesis 6
+
+Hypothesis: Quality of LSH queries degenerates as density of sites increases.
+
+Method of evaluation: We generate a uniformly-distributed set of sites inside of the unit hypercube centered around the origin. Successive instances increase the number of sites linearly.
+
+#+begin_src python :tangle hypothesis_6.py
+#!/usr/bin/env python3
+
+# Hypothesis 6: Quality of LSH queries degenerates as density of sites increases.
+
+
+import itertools
+import time
+import numpy as np
+import h5py
+import faiss
+
+n_sites = [100, 1000, 5000, 10000, 50000, 100000, 500000, 100000]
+n_dims = [100 for i in range(len(n_sites))]
+k = 5
+filepath = "data/hypothesis_6"
+
+hypothesis = "Quality of LSH queries degenerates as density of sites increases."
+
+description = """
+We generate a uniformly-distributed set of sites inside of the unit hypercube centered around the origin. Successive instances increase the number of sites linearly.
+"""
+
+np.random.seed(42)
+
+file = h5py.File(filepath, 'w')
+file.attrs['k'] = k
+file.attrs['n_instances'] = len(n_dims)
+file.attrs['description'] = description
+file.attrs['hypothesis'] = hypothesis
+
+for i in range(len(n_dims)):
+
+    print(f'Generating instance {i}:')
+    time_start = time.perf_counter()
+    sites = np.random.uniform(-0.5, 0.5, (n_sites[i], n_dims[i]))
+    time_end = time.perf_counter()
+    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
+
+    query = np.random.uniform(-0.5, 0.5, (1, n_dims[i]))
+    time_start = time.perf_counter()
+    index = faiss.IndexFlatL2(n_dims[i])
+    index.add(sites)
+    time_end = time.perf_counter()
+    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
+
+    time_start = time.perf_counter()
+    distance, solution = index.search(query, k)
+    time_end = time.perf_counter()
+    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
+
+    instance = file.create_dataset('instance_' + str(i), data=sites)
+    instance.attrs['n_sites'] = n_sites[i]
+    instance.attrs['n_dims'] = n_dims[i]
+    instance.attrs['n_planes'] = n_dims[i] * 2
     file.create_dataset('query_' + str(i), data=query)
     file.create_dataset('solution_' + str(i), data=solution)
     file.create_dataset('distance_' + str(i), data=distance)
