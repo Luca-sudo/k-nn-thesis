@@ -479,7 +479,7 @@ for i in range(len(n_dims)):
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
     instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = extent ** 2
+    instance.attrs['n_sites'] = extent ** n_dims[i]
     instance.attrs['n_dims'] = n_dims[i]
     instance.attrs['n_planes'] = n_dims[i] * 2
     file.create_dataset('query_' + str(i), data=query)
