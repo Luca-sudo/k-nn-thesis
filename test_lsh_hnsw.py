@@ -40,8 +40,10 @@ for i in range(n_instances):
     n_dim = dataset.attrs['n_dims'].item()
     n_sites = dataset.attrs['n_sites']
     n_planes = dataset.attrs['n_planes'].item()
+    print('n_planes: ', n_planes)
     sites = dataset[()]
     optimal_distances = file['distance_' + str(i)][()]
+    ordered_sites = file['ordered_sites_' + str(i)][()]
     query = file['query_' + str(i)][()]
     solution = file['solution_' + str(i)][()]
     time_end = time.perf_counter()
@@ -59,7 +61,7 @@ for i in range(n_instances):
     print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
 
     time_start = time.perf_counter()
-    hnsw_distance, queried_solution = hnsw_index.search(query, k)
+    hnsw_distance, hnsw_solutions = hnsw_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     hnsw_creation.append(dt)
@@ -98,6 +100,12 @@ for i in range(n_instances):
     lsh_median.append(lsh_quality[1])
     hnsw_max.append(max(hnsw_quality))
     lsh_max.append(max(lsh_quality))
+
+    lsh_neighbor_order = ordered_sites[lsh_solutions]
+    hnsw_neighbor_order = ordered_sites[hnsw_solutions]
+
+    print('\tLSH Neighbor Order: ', lsh_neighbor_order)
+    print('\tHNSW Neighbor Order: ', hnsw_neighbor_order)
 
 rows = zip(data_extraction, hnsw_creation, hnsw_querying, lsh_creation, lsh_querying, hnsw_min, hnsw_median, hnsw_max, lsh_min, lsh_median, lsh_max)
 
