@@ -8,6 +8,6 @@
 - [x] Hypothesis 6: Quality of LSH queries degenerates as density of sites increases.
 - [ ] Hypothesis 7: Version of hypothesis 3 that translates grid by irrational number to avoid cosine similarity interference.
 - [ ] Hypothesis 8: Compare LSH & HNSW on Hypersphere. Should be LSH friendly by avoiding colinearity issues.
-- [ ] Hypothesis 9: 
+- [ ] Hypothesis ?: Compare Ball-Tree and k-d Tree 
 
 
