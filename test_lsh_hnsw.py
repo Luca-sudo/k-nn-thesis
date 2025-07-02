@@ -88,8 +88,8 @@ for i in range(n_instances):
     sorted_lsh_distances = sorted(lsh_distance)
     sorted_hnsw_distances = sorted(hnsw_distance[0])
 
-    lsh_quality = optimal_distances[0] / sorted_lsh_distances
-    hnsw_quality = optimal_distances[0] / sorted_hnsw_distances
+    lsh_quality = optimal_distances / sorted_lsh_distances
+    hnsw_quality = optimal_distances / sorted_hnsw_distances
 
     print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
     print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
