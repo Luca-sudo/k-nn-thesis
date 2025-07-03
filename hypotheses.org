@@ -1,5 +1,8 @@
 #+title: Hypotheses
 
+This file serves as a literate program for the data generation of all hypotheses. Each section states the hypothesis, describes the test instance and explains portions of the source code. Note that all .py files of the form `hypothesis_i.py` are generated from this file using the babel extension for emacs.
+
+A literate program testing the generated data and evaluating aspects such as quality, performance, etc. can be found at `test_lsh_hnsw.org`. It, too, motivates portions of the source code.
 
 * Hypothesis 1
 
