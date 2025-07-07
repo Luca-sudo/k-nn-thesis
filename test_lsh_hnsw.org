@@ -191,7 +191,7 @@ df = pd.DataFrame({
     'lsh_max_quality' : lsh_max,
     'lsh_ranks' : lsh_ranks,
     'hnsw_ranks' : hnsw_ranks
-});
+})
 
 
 csv_path = filepath + ".csv"
@@ -200,7 +200,7 @@ df.to_csv(csv_path)
 
 fig_path = filepath + ".pdf"
 
-fig, axes = plt.subplots(1, 3)
+fig, axes = plt.subplots(1, 5)
 
 sns.lineplot(
     data=df[['lsh_min_quality', 'hnsw_min_quality']], ax=axes[0])
@@ -213,6 +213,12 @@ axes[1].set_title('Median Quality')
 sns.lineplot(
     data=df[['lsh_max_quality', 'hnsw_max_quality']], ax=axes[2])
 axes[2].set_title('Maximum Quality')
+
+sns.boxplot(data=df[['hnsw_creation', 'lsh_creation']], ax=axes[3])
+axes[3].set_title('Index Creation Time')
+
+sns.boxplot(data=df[['hnsw_query', 'lsh_query']], ax=axes[4])
+axes[4].set_title('Index Query Times')
 
 plt.savefig(fig_path)
 plt.show()
