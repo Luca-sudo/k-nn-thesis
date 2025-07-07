@@ -32,6 +32,8 @@ hnsw_max = []
 lsh_min = []
 lsh_median = []
 lsh_max = []
+hnsw_ranks = []
+lsh_ranks = []
 
 for i in range(n_instances):
     print(f'Extracting instance {i}.')
@@ -101,23 +103,15 @@ for i in range(n_instances):
     hnsw_max.append(max(hnsw_quality))
     lsh_max.append(max(lsh_quality))
 
-    lsh_neighbor_order = ordered_sites[lsh_solutions]
-    hnsw_neighbor_order = ordered_sites[hnsw_solutions]
+    current_lsh_ranks = ordered_sites[lsh_solutions]
+    current_hnsw_ranks = ordered_sites[hnsw_solutions]
 
-    print('\tLSH Neighbor Order: ', lsh_neighbor_order)
-    print('\tHNSW Neighbor Order: ', hnsw_neighbor_order)
+    lsh_ranks.append(current_lsh_ranks)
+    hnsw_ranks.append(current_hnsw_ranks)
 
-print(len(data_extraction))
-print(len(hnsw_creation))
-print(len(hnsw_querying))
-print(len(lsh_creation))
-print(len(lsh_querying))
-print(len(hnsw_min))
-print(len(hnsw_median))
-print(len(hnsw_max))
-print(len(lsh_min))
-print(len(lsh_median))
-print(len(lsh_max))
+    print('\tLSH Ranks: ', current_lsh_ranks)
+    print('\tHNSW Ranks: ', current_hnsw_ranks)
+
 df = pd.DataFrame({
     'data_extraction' : data_extraction,
     'hnsw_creation' : hnsw_creation,
@@ -129,7 +123,9 @@ df = pd.DataFrame({
     'hnsw_max_quality' : hnsw_max,
     'lsh_min_quality' : lsh_min,
     'lsh_median_quality' : lsh_median,
-    'lsh_max_quality' : lsh_max
+    'lsh_max_quality' : lsh_max,
+    'lsh_ranks' : lsh_ranks,
+    'hnsw_ranks' : hnsw_ranks
 });
 
 

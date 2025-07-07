@@ -59,6 +59,8 @@ hnsw_max = []
 lsh_min = []
 lsh_median = []
 lsh_max = []
+hnsw_ranks = []
+lsh_ranks = []
 #+end_src
 
 Finally, we begin evaluating all instances. For this we extract the data, which includes the dimensionality, amount of sites, optimal solutions to the k-nearest neighbour query, etc.
@@ -161,29 +163,19 @@ Finally, we print and store the values of interest: minimum, median and maximum 
 Besides the quality, the nearest neighbor order is of interest too. It is an integer $i$ that, for a given site $s$, denotes that $s$ is the $i$-th neighbor. To accelerate determining $i$, it suffices to index into the `ordered_sites_i` list. At position $s$ of the `ordered_sites_i` list -- note that faiss indices return index values into the original list of sites -- the corresponding $i$ can be extracted.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-    lsh_neighbor_order = ordered_sites[lsh_solutions]
-    hnsw_neighbor_order = ordered_sites[hnsw_solutions]
+    current_lsh_ranks = ordered_sites[lsh_solutions]
+    current_hnsw_ranks = ordered_sites[hnsw_solutions]
 
-    print('\tLSH Neighbor Order: ', lsh_neighbor_order)
-    print('\tHNSW Neighbor Order: ', hnsw_neighbor_order)
+    lsh_ranks.append(current_lsh_ranks)
+    hnsw_ranks.append(current_hnsw_ranks)
 
+    print('\tLSH Ranks: ', current_lsh_ranks)
+    print('\tHNSW Ranks: ', current_hnsw_ranks)
 #+end_src
 
 :TODO: Add section on csv and plot generation.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-
-print(len(data_extraction))
-print(len(hnsw_creation))
-print(len(hnsw_querying))
-print(len(lsh_creation))
-print(len(lsh_querying))
-print(len(hnsw_min))
-print(len(hnsw_median))
-print(len(hnsw_max))
-print(len(lsh_min))
-print(len(lsh_median))
-print(len(lsh_max))
 df = pd.DataFrame({
     'data_extraction' : data_extraction,
     'hnsw_creation' : hnsw_creation,
@@ -195,7 +187,9 @@ df = pd.DataFrame({
     'hnsw_max_quality' : hnsw_max,
     'lsh_min_quality' : lsh_min,
     'lsh_median_quality' : lsh_median,
-    'lsh_max_quality' : lsh_max
+    'lsh_max_quality' : lsh_max,
+    'lsh_ranks' : lsh_ranks,
+    'hnsw_ranks' : hnsw_ranks
 });
 
 
