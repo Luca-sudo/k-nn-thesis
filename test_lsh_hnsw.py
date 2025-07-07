@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
-import csv
+import pandas as pd
 import sys
 import time
 import numpy as np
@@ -21,17 +21,17 @@ hypothesis = file.attrs['hypothesis']
 print(f'Hypothesis: {hypothesis}')
 print(f'Description: {description}')
 
-data_extraction = ["Data extraction in seconds"]
-hnsw_creation = ["Creation of HNSW index in seconds"]
-hnsw_querying = ["Querying of HNSW index in seconds"]
-lsh_creation = ["Creation of LSH index in seconds"]
-lsh_querying = ["Querying of LSH index in seconds"]
-hnsw_min = ["HNSW Min Quality"]
-hnsw_median = ["HNSW Median Quality"]
-hnsw_max = ["HNSW Max Quality"]
-lsh_min = ["LSH Min Quality"]
-lsh_median = ["LSH Median Quality"]
-lsh_max = ["LSH Max Quality"]
+data_extraction = []
+hnsw_creation = []
+hnsw_querying = []
+lsh_creation = []
+lsh_querying = []
+hnsw_min = []
+hnsw_median = []
+hnsw_max = []
+lsh_min = []
+lsh_median = []
+lsh_max = []
 
 for i in range(n_instances):
     print(f'Extracting instance {i}.')
@@ -64,7 +64,7 @@ for i in range(n_instances):
     hnsw_distance, hnsw_solutions = hnsw_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_creation.append(dt)
+    hnsw_querying.append(dt)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
 
     time_start = time.perf_counter()
@@ -72,14 +72,14 @@ for i in range(n_instances):
     lsh_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_creation.append(dt)
+    lsh_creation.append(dt)
     print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
 
     time_start = time.perf_counter()
     _, lsh_solutions = lsh_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_creation.append(dt)
+    lsh_querying.append(dt)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
 
     solution_vectors = sites[lsh_solutions]
@@ -107,28 +107,50 @@ for i in range(n_instances):
     print('\tLSH Neighbor Order: ', lsh_neighbor_order)
     print('\tHNSW Neighbor Order: ', hnsw_neighbor_order)
 
-rows = zip(data_extraction, hnsw_creation, hnsw_querying, lsh_creation, lsh_querying, hnsw_min, hnsw_median, hnsw_max, lsh_min, lsh_median, lsh_max)
+print(len(data_extraction))
+print(len(hnsw_creation))
+print(len(hnsw_querying))
+print(len(lsh_creation))
+print(len(lsh_querying))
+print(len(hnsw_min))
+print(len(hnsw_median))
+print(len(hnsw_max))
+print(len(lsh_min))
+print(len(lsh_median))
+print(len(lsh_max))
+df = pd.DataFrame({
+    'data_extraction' : data_extraction,
+    'hnsw_creation' : hnsw_creation,
+    'hnsw_query' : hnsw_querying,
+    'lsh_creation' : lsh_creation,
+    'lsh_query' : lsh_querying,
+    'hnsw_min_quality' : hnsw_min,
+    'hnsw_median_quality' : hnsw_median,
+    'hnsw_max_quality' : hnsw_max,
+    'lsh_min_quality' : lsh_min,
+    'lsh_median_quality' : lsh_median,
+    'lsh_max_quality' : lsh_max
+});
+
 
 csv_path = filepath + ".csv"
 
-with open(csv_path, 'w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerows(rows)
+df.to_csv(csv_path)
 
 helper = [2**i for i in range(n_instances)]
 
 fig, (p1, p2, p3) = plt.subplots(1, 3)
 
 p1.set_title('Minimum Quality')
-p1.plot(helper, lsh_min[1:], 'b', helper, hnsw_min[1:], 'g')
+p1.plot(helper, lsh_min, 'b', helper, hnsw_min, 'g')
 p1.set_xscale('log', base=2)
 
 p2.set_title('Median Quality')
-p2.plot(helper, lsh_median[1:], 'b', helper, hnsw_median[1:], 'g')
+p2.plot(helper, lsh_median, 'b', helper, hnsw_median, 'g')
 p2.set_xscale('log', base=2)
 
 p3.set_title('Maximum Quality')
-p3.plot(helper, lsh_max[1:], 'b', helper, hnsw_max[1:], 'g')
+p3.plot(helper, lsh_max, 'b', helper, hnsw_max, 'g')
 p3.set_xscale('log', base=2)
 
 

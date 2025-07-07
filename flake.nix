@@ -17,6 +17,7 @@
 					numpy
 					h5py
           matplotlib
+          pandas
 				];
 			};
 		}
