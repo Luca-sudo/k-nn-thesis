@@ -10,4 +10,7 @@
 - [ ] Hypothesis 8: Compare LSH & HNSW on Hypersphere. Should be LSH friendly by avoiding colinearity issues.
 - [ ] Hypothesis ?: Compare Ball-Tree and k-d Tree 
 
+# TODO
+- [ ] Add ranks to LSH vs. HNSW plot
+
 

@@ -16,6 +16,7 @@ Before we can do this, we first have to import any necessary library. To this en
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 import sys
 import time
 import numpy as np
@@ -197,22 +198,24 @@ csv_path = filepath + ".csv"
 
 df.to_csv(csv_path)
 
-helper = [2**i for i in range(n_instances)]
+fig_path = filepath + ".pdf"
 
-fig, (p1, p2, p3) = plt.subplots(1, 3)
+fig, axes = plt.subplots(1, 3)
 
-p1.set_title('Minimum Quality')
-p1.plot(helper, lsh_min, 'b', helper, hnsw_min, 'g')
-p1.set_xscale('log', base=2)
+sns.lineplot(
+    data=df[['lsh_min_quality', 'hnsw_min_quality']], ax=axes[0])
+axes[0].set_title('Minimum Quality')
 
-p2.set_title('Median Quality')
-p2.plot(helper, lsh_median, 'b', helper, hnsw_median, 'g')
-p2.set_xscale('log', base=2)
+sns.lineplot(
+    data=df[['lsh_median_quality', 'hnsw_median_quality']], ax=axes[1])
+axes[1].set_title('Median Quality')
 
-p3.set_title('Maximum Quality')
-p3.plot(helper, lsh_max, 'b', helper, hnsw_max, 'g')
-p3.set_xscale('log', base=2)
+sns.lineplot(
+    data=df[['lsh_max_quality', 'hnsw_max_quality']], ax=axes[2])
+axes[2].set_title('Maximum Quality')
 
-
+plt.savefig(fig_path)
 plt.show()
+
+
 #+end_src

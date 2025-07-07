@@ -18,6 +18,7 @@
 					h5py
           matplotlib
           pandas
+          seaborn
 				];
 			};
 		}
