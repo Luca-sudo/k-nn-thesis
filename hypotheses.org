@@ -16,7 +16,7 @@ As is common with all test for LSH and HNSW, we evaluate the /quality/ of the so
 
 For the implementation: Of course, the usual preamble that imports required modules, defines a target path for the data to be generated, and seeds the RNG is required. For those running the script from the CLI, we also provide the hypothesis and a description of the test.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
 #!/usr/bin/env python3
 
 # Hypothesis 1: HNSW remains more precise than LSH on clustered data as the number of sites grows.
@@ -39,7 +39,7 @@ We generate two clusters, centered at $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.
 
 Afterwards, we define all instances through lists of parameters: the number of sites (n_sites), the dimensionality (n_dims), and the number of nearest neighbors to compute (k).
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
 n_sites = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
 n_dims = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 k = 5
@@ -47,7 +47,7 @@ k = 5
 
 We then check that we have equally many values for n_sites and n_dims. Otherwise, we forgot to define our instances appropriately. Following this check, we already write the parameter k and the number of instances to our target file. We also write the brief description and hypothesis to the file already.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
 assert(len(n_sites) == len(n_dims))
 
 file = h5py.File(filepath, 'w')
@@ -59,13 +59,13 @@ file.attrs['hypothesis'] = hypothesis
 
 What follows now is the actual generation of instance data.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
 for i in range(len(n_sites)):
 #+end_src
 
 For this hypothesis, we generate two clusters centered around $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.5)$, and time this generation.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     first_cluster = np.random.uniform(-0.7, -0.3, (int(n_sites[i] / 2), n_dims[i]))
@@ -77,13 +77,13 @@ For this hypothesis, we generate two clusters centered around $(-0.5, \dots, -0.
 
 We similarly generate a random query.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     query = np.random.uniform(-1.0, 1.0, (1, n_dims[i]))
 #+end_src
 
 Afterwards, we generate the flat index -- that is, an index that linearly scans -- on the sites and query against it. Its exhaustiveness guarantees detection of optimal solutions.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims[i])
     index.add(sites)
@@ -99,7 +99,7 @@ Finally, we write all the instance data to file under the dataset instance_i. Th
 
 Note that we materialize the three different views into the solution list, since supplying `file.create_dataset(..., data = solution[0][:k])` evaluates to the raw pointer, storing the solution list itself.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     k_nearest = solution[0][:k]
     ordered_sites = solution[0]
     k_nearest_distances = distance[0][:k]
@@ -107,7 +107,7 @@ Note that we materialize the three different views into the solution list, since
 
 In order to accelerate determination of the neighbor ordering $i$ of a site $s$, we invert the role of indices and values in the `ordered_sites` list. Then, indexing into this list with the appropriate site $s$, which is merely an id, yields the desired $i$ in constant time. Otherwise, the list would need to be searched for the site $s$, drastically decreasing speed.
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     def invert(l):
         new_l = [0 for i in range(len(l))]
 
@@ -120,7 +120,7 @@ In order to accelerate determination of the neighbor ordering $i$ of a site $s$,
 #+end_src
 
 
-#+begin_src python :tangle hypothesis_1.py
+#+begin_src python :tangle hypotheses/hypothesis_1.py
     instance = file.create_dataset('instance_' + str(i), data=sites)
     instance.attrs['n_sites'] = n_sites[i]
     instance.attrs['n_dims'] = n_dims[i]
@@ -141,7 +141,7 @@ Method of evaluation: All generated instances exhibit the same number of overall
 
 We begin with the usual preamble, importin modules, declaring target filepaths for to-be-generated data, etc.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
 #!/usr/bin/env python3
 
 # Hypothesis 2: HNSW quality remains steady while LSH quality improves with increased spread (due to higher cosine similarity).
@@ -170,14 +170,14 @@ k = 5
 
 Finally, we define a list of spreads, which correspond to the aforementioned distance between the centers cluster points.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
 # This includes spreads up until (and including) $2^{20}$.
 spreads = [2.0 ** i for i in range(21)]
 #+end_src
 
 We then write attributes shared across all instances to the file and begin generating data for each instance.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
 file.attrs['n_instances'] = len(spreads)
@@ -189,7 +189,7 @@ for i in range(len(spreads)):
 
 The first cluster is centered at $-2^{i-1}$, while the second cluster is centered at $2^{i - 1}$. Within each cluster, the sites are sampled uniformly, akin to the first hypothesis. Each clusters forms a hypoercube of diameter $0.4$. Our entire set of sites is made up of the first cluster and the second cluster.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     first_center = -(spreads[i] / 2.0)
@@ -203,13 +203,13 @@ The first cluster is centered at $-2^{i-1}$, while the second cluster is centere
 
 The query to benchmark is drawn uniformly too, but it samples coordinate values between $-2^{i-1}$ and $2^{i-1}$. This ensures that the query lies between both clusters and not inside one of them.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
     query = np.random.uniform(first_center, second_center, (1, n_dims))
 #+end_src
 
 Finally, we create a flat index for exhaustive search, add the sites and compute the optimal k-nearest neighbors. All of which is stored in the file, before we move on to the next instance and repeat.
 
-#+begin_src python :tangle hypothesis_2.py
+#+begin_src python :tangle hypotheses/hypothesis_2.py
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims)
     index.add(sites)
@@ -255,7 +255,7 @@ Method of evaluation: We generate a set of integer-coordinate sites within the t
 
 We begin with the usual preamble:
 
-#+begin_src python :tangle hypothesis_3.py
+#+begin_src python :tangle hypotheses/hypothesis_3.py
 #!/usr/bin/env python3
 
 # Hypothesis 3: HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions.
@@ -290,7 +290,7 @@ for i in range(len(extents)):
 
 Afterwards, we generate the set of sites. To reiterate: this set comprises /all/ integer-coordinate sites in the feature space, that reside inside of the square spanned by the current extent.
 
-#+begin_src python :tangle hypothesis_3.py
+#+begin_src python :tangle hypotheses/hypothesis_3.py
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     sites = [(x,y) for x in range(extents[i]) for y in range(extents[i])]
@@ -301,7 +301,7 @@ Afterwards, we generate the set of sites. To reiterate: this set comprises /all/
 
 Then, everything else follows the form of previous hypothesis: generate an index for exhaustive search, compute the optimal solutions, write all relevant data to file.
 
-#+begin_src python :tangle hypothesis_3.py
+#+begin_src python :tangle hypotheses/hypothesis_3.py
     query = np.random.uniform(0, extents[i], (1, n_dims))
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims)
@@ -345,7 +345,7 @@ Hypothesis: The observed loss of quality in hypothesis 3 can be counteracted by 
 Method of Evaluation: Consider a uniform grid, akin to hypothesis 3, but this time with a fixed extent. Successive instances increase the number of separating hyperplanes.
 
 
-#+begin_src python :tangle hypothesis_4.py
+#+begin_src python :tangle hypotheses/hypothesis_4.py
 #!/usr/bin/env python3
 
 # Hypothesis 4: The observed loss of quality in hypothesis 3 can be counteracted by increasing the number of separating hyperplanes.
@@ -430,7 +430,7 @@ Method of evaluation: Successive instances share the extent of the bounded regio
 
 Note that this hypothesis requires the library `itertools` in order to generate all sites of the uniform grid for variable dimensions.
 
-#+begin_src python :tangle hypothesis_5.py
+#+begin_src python :tangle hypotheses/hypothesis_5.py
 #!/usr/bin/env python3
 
 # Hypothesis 5: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
@@ -512,7 +512,7 @@ Hypothesis: Quality of LSH queries degenerates as density of sites increases.
 
 Method of evaluation: We generate a uniformly-distributed set of sites inside of the unit hypercube centered around the origin. Successive instances increase the number of sites linearly.
 
-#+begin_src python :tangle hypothesis_6.py
+#+begin_src python :tangle hypotheses/hypothesis_6.py
 #!/usr/bin/env python3
 
 # Hypothesis 6: Quality of LSH queries degenerates as density of sites increases.
