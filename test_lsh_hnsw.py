@@ -22,19 +22,9 @@ hypothesis = file.attrs['hypothesis']
 print(f'Hypothesis: {hypothesis}')
 print(f'Description: {description}')
 
-data_extraction = []
-hnsw_creation = []
-hnsw_querying = []
-lsh_creation = []
-lsh_querying = []
-hnsw_min = []
-hnsw_median = []
-hnsw_max = []
-lsh_min = []
-lsh_median = []
-lsh_max = []
-hnsw_ranks = []
-lsh_ranks = []
+timings = []
+qualities = []
+ranks = []
 
 for i in range(n_instances):
     print(f'Extracting instance {i}.')
@@ -51,7 +41,6 @@ for i in range(n_instances):
     solution = file['solution_' + str(i)][()]
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    data_extraction.append(dt)
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
     time_start = time.perf_counter()
@@ -60,30 +49,50 @@ for i in range(n_instances):
     hnsw_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_creation.append(dt)
     print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'hnsw',
+        'event' : 'creation',
+        'dt' : dt
+    })
 
     time_start = time.perf_counter()
     hnsw_distance, hnsw_solutions = hnsw_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_querying.append(dt)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'hnsw',
+        'event' : 'query',
+        'dt' : dt
+    })
 
     time_start = time.perf_counter()
     lsh_index = faiss.IndexLSH(n_dim, n_planes)
     lsh_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    lsh_creation.append(dt)
     print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'lsh',
+        'event' : 'creation',
+        'dt' : dt
+    })
 
     time_start = time.perf_counter()
     _, lsh_solutions = lsh_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    lsh_querying.append(dt)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'lsh',
+        'event' : 'query',
+        'dt' : dt
+    })
 
     solution_vectors = sites[lsh_solutions]
     lsh_distance = np.sum((solution_vectors[0] - query) ** 2, axis=1)
@@ -97,64 +106,44 @@ for i in range(n_instances):
     print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
     print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
 
-    hnsw_min.append(min(hnsw_quality))
-    lsh_min.append(min(lsh_quality))
-    hnsw_median.append(hnsw_quality[1])
-    lsh_median.append(lsh_quality[1])
-    hnsw_max.append(max(hnsw_quality))
-    lsh_max.append(max(lsh_quality))
+    for q in lsh_quality:
+        qualities.append({
+            'instance' : i,
+            'algo' : 'lsh',
+            'value' : q
+        })
+
+    for q in hnsw_quality:
+        qualities.append({
+            'instance' : i,
+            'algo' : 'hnsw',
+            'value' : q
+        })
 
     current_lsh_ranks = ordered_sites[lsh_solutions]
     current_hnsw_ranks = ordered_sites[hnsw_solutions]
 
-    lsh_ranks.append(current_lsh_ranks)
-    hnsw_ranks.append(current_hnsw_ranks)
+    for r in current_lsh_ranks[0]:
+        ranks.append({
+            'instance' : i,
+            'algo' : 'lsh',
+            'value' : r
+        })
+
+    for r in current_hnsw_ranks[0]:
+        ranks.append({
+            'instance' : i,
+            'algo' : 'hnsw',
+            'value' : r
+        })
 
     print('\tLSH Ranks: ', current_lsh_ranks)
     print('\tHNSW Ranks: ', current_hnsw_ranks)
 
-df = pd.DataFrame({
-    'data_extraction' : data_extraction,
-    'hnsw_creation' : hnsw_creation,
-    'hnsw_query' : hnsw_querying,
-    'lsh_creation' : lsh_creation,
-    'lsh_query' : lsh_querying,
-    'hnsw_min_quality' : hnsw_min,
-    'hnsw_median_quality' : hnsw_median,
-    'hnsw_max_quality' : hnsw_max,
-    'lsh_min_quality' : lsh_min,
-    'lsh_median_quality' : lsh_median,
-    'lsh_max_quality' : lsh_max,
-    'lsh_ranks' : lsh_ranks,
-    'hnsw_ranks' : hnsw_ranks
-})
+timings = pd.DataFrame(timings)
+qualities = pd.DataFrame(qualities)
+ranks = pd.DataFrame(ranks)
 
-
-csv_path = filepath + ".csv"
-
-df.to_csv(csv_path)
-
-fig_path = filepath + ".pdf"
-
-fig, axes = plt.subplots(1, 5)
-
-sns.lineplot(
-    data=df[['lsh_min_quality', 'hnsw_min_quality']], ax=axes[0])
-axes[0].set_title('Minimum Quality')
-
-sns.lineplot(
-    data=df[['lsh_median_quality', 'hnsw_median_quality']], ax=axes[1])
-axes[1].set_title('Median Quality')
-
-sns.lineplot(
-    data=df[['lsh_max_quality', 'hnsw_max_quality']], ax=axes[2])
-axes[2].set_title('Maximum Quality')
-
-sns.boxplot(data=df[['hnsw_creation', 'lsh_creation']], ax=axes[3])
-axes[3].set_title('Index Creation Time')
-
-sns.boxplot(data=df[['hnsw_query', 'lsh_query']], ax=axes[4])
-axes[4].set_title('Index Query Times')
-
-plt.savefig(fig_path)
-plt.show()
+timings.to_csv(filepath + "_timings.csv")
+qualities.to_csv(filepath + "_qualities.csv")
+ranks.to_csv(filepath + "_ranks.csv")

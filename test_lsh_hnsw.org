@@ -49,19 +49,9 @@ print(f'Description: {description}')
 Before testing each instance, we setup lists for all data that we are interested in. We initialize these lists with a short, descriptive string; this lets us write the data to a .csv file descriptively later on.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-data_extraction = []
-hnsw_creation = []
-hnsw_querying = []
-lsh_creation = []
-lsh_querying = []
-hnsw_min = []
-hnsw_median = []
-hnsw_max = []
-lsh_min = []
-lsh_median = []
-lsh_max = []
-hnsw_ranks = []
-lsh_ranks = []
+timings = []
+qualities = []
+ranks = []
 #+end_src
 
 Finally, we begin evaluating all instances. For this we extract the data, which includes the dimensionality, amount of sites, optimal solutions to the k-nearest neighbour query, etc.
@@ -82,7 +72,6 @@ for i in range(n_instances):
     solution = file['solution_' + str(i)][()]
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    data_extraction.append(dt)
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 #+end_src
 
@@ -95,8 +84,13 @@ With the instance data at hand, we now create the HNSW index and time it.
     hnsw_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_creation.append(dt)
     print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'hnsw',
+        'event' : 'creation',
+        'dt' : dt
+    })
 #+end_src
 
 We then query this HNSW index.
@@ -106,8 +100,13 @@ We then query this HNSW index.
     hnsw_distance, hnsw_solutions = hnsw_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    hnsw_querying.append(dt)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'hnsw',
+        'event' : 'query',
+        'dt' : dt
+    })
 #+end_src
 
 Afterwards, we create the LSH index and query it too.
@@ -118,15 +117,25 @@ Afterwards, we create the LSH index and query it too.
     lsh_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    lsh_creation.append(dt)
     print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'lsh',
+        'event' : 'creation',
+        'dt' : dt
+    })
 
     time_start = time.perf_counter()
     _, lsh_solutions = lsh_index.search(query, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
-    lsh_querying.append(dt)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+    timings.append({
+        'instance' : i,
+        'algo' : 'lsh',
+        'event' : 'query',
+        'dt' : dt
+    })
 #+end_src
 
 Before we can evaluate the quality of the LSH index, we have to calculate the distances for candidate solutions manually. While the HNSW index returned euclidean distances together with the set of candidate solutions, LSH returns the hamming distance instead. We, therefore, calculate the euclidean distances for all LSH candidate solutions.
@@ -153,12 +162,20 @@ Finally, we print and store the values of interest: minimum, median and maximum 
     print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
     print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
 
-    hnsw_min.append(min(hnsw_quality))
-    lsh_min.append(min(lsh_quality))
-    hnsw_median.append(hnsw_quality[1])
-    lsh_median.append(lsh_quality[1])
-    hnsw_max.append(max(hnsw_quality))
-    lsh_max.append(max(lsh_quality))
+    for q in lsh_quality:
+        qualities.append({
+            'instance' : i,
+            'algo' : 'lsh',
+            'value' : q
+        })
+
+    for q in hnsw_quality:
+        qualities.append({
+            'instance' : i,
+            'algo' : 'hnsw',
+            'value' : q
+        })
+
 #+end_src
 
 Besides the quality, the nearest neighbor order is of interest too. It is an integer $i$ that, for a given site $s$, denotes that $s$ is the $i$-th neighbor. To accelerate determining $i$, it suffices to index into the `ordered_sites_i` list. At position $s$ of the `ordered_sites_i` list -- note that faiss indices return index values into the original list of sites -- the corresponding $i$ can be extracted.
@@ -167,8 +184,19 @@ Besides the quality, the nearest neighbor order is of interest too. It is an int
     current_lsh_ranks = ordered_sites[lsh_solutions]
     current_hnsw_ranks = ordered_sites[hnsw_solutions]
 
-    lsh_ranks.append(current_lsh_ranks)
-    hnsw_ranks.append(current_hnsw_ranks)
+    for r in current_lsh_ranks[0]:
+        ranks.append({
+            'instance' : i,
+            'algo' : 'lsh',
+            'value' : r
+        })
+
+    for r in current_hnsw_ranks[0]:
+        ranks.append({
+            'instance' : i,
+            'algo' : 'hnsw',
+            'value' : r
+        })
 
     print('\tLSH Ranks: ', current_lsh_ranks)
     print('\tHNSW Ranks: ', current_hnsw_ranks)
@@ -177,51 +205,46 @@ Besides the quality, the nearest neighbor order is of interest too. It is an int
 :TODO: Add section on csv and plot generation.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-df = pd.DataFrame({
-    'data_extraction' : data_extraction,
-    'hnsw_creation' : hnsw_creation,
-    'hnsw_query' : hnsw_querying,
-    'lsh_creation' : lsh_creation,
-    'lsh_query' : lsh_querying,
-    'hnsw_min_quality' : hnsw_min,
-    'hnsw_median_quality' : hnsw_median,
-    'hnsw_max_quality' : hnsw_max,
-    'lsh_min_quality' : lsh_min,
-    'lsh_median_quality' : lsh_median,
-    'lsh_max_quality' : lsh_max,
-    'lsh_ranks' : lsh_ranks,
-    'hnsw_ranks' : hnsw_ranks
-})
 
+timings = pd.DataFrame(timings)
+qualities = pd.DataFrame(qualities)
+ranks = pd.DataFrame(ranks)
 
-csv_path = filepath + ".csv"
+timings.to_csv(filepath + "_timings.csv")
+qualities.to_csv(filepath + "_qualities.csv")
+ranks.to_csv(filepath + "_ranks.csv")
+#+end_src
 
-df.to_csv(csv_path)
+#+begin_src python :tangle plot_lsh_hnsw.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import sys
 
-fig_path = filepath + ".pdf"
+if(len(sys.argv) <= 1):
+    raise Exception("Please supply a filepath for data to plot!")
 
-fig, axes = plt.subplots(1, 5)
+filepath, _ = os.path.splitext(sys.argv[1])
 
-sns.lineplot(
-    data=df[['lsh_min_quality', 'hnsw_min_quality']], ax=axes[0])
-axes[0].set_title('Minimum Quality')
+qualities = pd.read_csv(filepath + "_qualities.csv")
+timings = pd.read_csv(filepath + "_timings.csv")
+ranks = pd.read_csv(filepath + "_ranks.csv")
 
-sns.lineplot(
-    data=df[['lsh_median_quality', 'hnsw_median_quality']], ax=axes[1])
-axes[1].set_title('Median Quality')
+sns.lineplot(data=qualities, x='instance', y='value', hue='algo')
 
-sns.lineplot(
-    data=df[['lsh_max_quality', 'hnsw_max_quality']], ax=axes[2])
-axes[2].set_title('Maximum Quality')
+plt.savefig(filepath + "_qualities.pdf")
 
-sns.boxplot(data=df[['hnsw_creation', 'lsh_creation']], ax=axes[3])
-axes[3].set_title('Index Creation Time')
+plt.clf()
 
-sns.boxplot(data=df[['hnsw_query', 'lsh_query']], ax=axes[4])
-axes[4].set_title('Index Query Times')
+sns.boxplot(data=ranks, x='instance', y='value', hue='algo')
 
-plt.savefig(fig_path)
-plt.show()
+plt.savefig(filepath + "_ranks.pdf")
 
+plt.clf()
+
+sns.boxplot(data=timings, x='event', y='dt', hue='algo')
+
+plt.savefig(filepath + "_timings.pdf")
 
 #+end_src
