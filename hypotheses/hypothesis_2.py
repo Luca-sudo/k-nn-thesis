@@ -57,7 +57,7 @@ for i in range(len(spreads)):
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
     k_nearest = solution[0][:k]
-    ordered_sites = solution[0]
+    ranks = solution[0]
     k_nearest_distances = distance[0][:k]
 
     def invert(l):
@@ -68,7 +68,7 @@ for i in range(len(spreads)):
 
         return new_l
 
-    ordered_sites = invert(ordered_sites)
+    ranks = invert(ranks)
 
 
     instance = file.create_dataset('instance_' + str(i), data=sites)
@@ -77,5 +77,5 @@ for i in range(len(spreads)):
     instance.attrs['n_planes'] = n_dims * 2
     file.create_dataset('query_' + str(i), data=query)
     file.create_dataset('solution_' + str(i), data=k_nearest)
-    file.create_dataset('ordered_sites_' + str(i), data = ordered_sites)
+    file.create_dataset('ranks_' + str(i), data = ranks)
     file.create_dataset('distance_' + str(i), data=k_nearest_distances)

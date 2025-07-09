@@ -36,7 +36,7 @@ for i in range(n_instances):
     print('n_planes: ', n_planes)
     sites = dataset[()]
     optimal_distances = file['distance_' + str(i)][()]
-    ordered_sites = file['ordered_sites_' + str(i)][()]
+    site_to_rank = file['ranks_' + str(i)][()]
     query = file['query_' + str(i)][()]
     solution = file['solution_' + str(i)][()]
     time_end = time.perf_counter()
@@ -120,8 +120,8 @@ for i in range(n_instances):
             'value' : q
         })
 
-    current_lsh_ranks = ordered_sites[lsh_solutions]
-    current_hnsw_ranks = ordered_sites[hnsw_solutions]
+    current_lsh_ranks = site_to_rank[lsh_solutions]
+    current_hnsw_ranks = site_to_rank[hnsw_solutions]
 
     for r in current_lsh_ranks[0]:
         ranks.append({
