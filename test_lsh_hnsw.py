@@ -18,6 +18,7 @@ k = file.attrs['k'].item()
 n_instances = file.attrs['n_instances']
 description = file.attrs['description']
 hypothesis = file.attrs['hypothesis']
+sample_size = file.attrs['sample_size']
 
 print(f'Hypothesis: {hypothesis}')
 print(f'Description: {description}')
@@ -37,7 +38,7 @@ for i in range(n_instances):
     sites = dataset[()]
     optimal_distances = file['distance_' + str(i)][()]
     site_to_rank = file['ranks_' + str(i)][()]
-    query = file['query_' + str(i)][()]
+    queries = file['queries_' + str(i)][()]
     solution = file['solution_' + str(i)][()]
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -58,7 +59,7 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
-    hnsw_distance, hnsw_solutions = hnsw_index.search(query, k)
+    hnsw_distance, hnsw_solutions = hnsw_index.search(queries, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
@@ -66,7 +67,7 @@ for i in range(n_instances):
         'instance' : i,
         'algo' : 'hnsw',
         'event' : 'query',
-        'dt' : dt
+        'dt' : dt / sample_size
     })
 
     time_start = time.perf_counter()
@@ -83,7 +84,7 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
-    _, lsh_solutions = lsh_index.search(query, k)
+    _, lsh_solutions = lsh_index.search(queries, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
@@ -91,54 +92,64 @@ for i in range(n_instances):
         'instance' : i,
         'algo' : 'lsh',
         'event' : 'query',
-        'dt' : dt
+        'dt' : dt / sample_size
     })
 
-    solution_vectors = sites[lsh_solutions]
-    lsh_distance = np.sum((solution_vectors[0] - query) ** 2, axis=1)
+    print(f'\tLSH Solutions: {lsh_solutions}')
+    print(f'\tHNSW Solutions: {hnsw_solutions}')
 
-    sorted_lsh_distances = sorted(lsh_distance)
-    sorted_hnsw_distances = sorted(hnsw_distance[0])
+    solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
+    lsh_distance = []
+    for sample_idx in range(sample_size):
+        print(sample_idx)
+        sample = solution_vectors[sample_idx, :, :]
+        distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
+        lsh_distance.append(distances)
+
+    sorted_lsh_distances = lsh_distance
+    sorted_hnsw_distances = list(map(lambda x : sorted(x), hnsw_distance))
+    print(f'hnsw_distance: {hnsw_distance}')
+    print(f'hnsw_sorted_distance: {sorted_hnsw_distances}')
 
     lsh_quality = optimal_distances / sorted_lsh_distances
+    print(f'lsh_quality {lsh_quality}')
     hnsw_quality = optimal_distances / sorted_hnsw_distances
+    print(f'hnsw_quality {hnsw_quality}')
 
-    print('\tLSH Min, Median, Max:\t\t', min(lsh_quality), lsh_quality[1], max(lsh_quality))
-    print('\tHNSW Min, Median, Max:\t\t', min(hnsw_quality), hnsw_quality[1], max(hnsw_quality))
+    for sample in lsh_quality:
+        for q in sample:
+                qualities.append({
+                'instance' : i,
+                'algo' : 'lsh',
+                'value' : q
+                })
 
-    for q in lsh_quality:
-        qualities.append({
-            'instance' : i,
-            'algo' : 'lsh',
-            'value' : q
-        })
+    for sample in hnsw_quality:
+        for q in sample:
+                qualities.append({
+                'instance' : i,
+                'algo' : 'hnsw',
+                'value' : q
+                })
 
-    for q in hnsw_quality:
-        qualities.append({
-            'instance' : i,
-            'algo' : 'hnsw',
-            'value' : q
-        })
+    current_lsh_ranks = []
+    current_hnsw_ranks = []
 
-    current_lsh_ranks = site_to_rank[lsh_solutions]
-    current_hnsw_ranks = site_to_rank[hnsw_solutions]
+    for sample_idx, neighbors in enumerate(lsh_solutions):
+        for r in site_to_rank[sample_idx][neighbors]:
+                ranks.append({
+                        'instance' : i,
+                        'algo' : 'lsh',
+                        'value' : r
+                })
 
-    for r in current_lsh_ranks[0]:
-        ranks.append({
-            'instance' : i,
-            'algo' : 'lsh',
-            'value' : r
-        })
-
-    for r in current_hnsw_ranks[0]:
-        ranks.append({
-            'instance' : i,
-            'algo' : 'hnsw',
-            'value' : r
-        })
-
-    print('\tLSH Ranks: ', current_lsh_ranks)
-    print('\tHNSW Ranks: ', current_hnsw_ranks)
+    for sample_idx, neighbors in enumerate(hnsw_solutions):
+        for r in site_to_rank[sample_idx][neighbors]:
+                ranks.append({
+                        'instance' : i,
+                        'algo' : 'hnsw',
+                        'value' : r
+                })
 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)

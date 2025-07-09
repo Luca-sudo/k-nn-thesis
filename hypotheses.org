@@ -43,6 +43,7 @@ Afterwards, we define all instances through lists of parameters: the number of s
 n_sites = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
 n_dims = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 k = 5
+sample_size = 20
 #+end_src
 
 We then check that we have equally many values for n_sites and n_dims. Otherwise, we forgot to define our instances appropriately. Following this check, we already write the parameter k and the number of instances to our target file. We also write the brief description and hypothesis to the file already.
@@ -55,6 +56,7 @@ file.attrs['k'] = k
 file.attrs['n_instances'] = len(n_sites)
 file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
+file.attrs['sample_size'] = sample_size
 #+end_src
 
 What follows now is the actual generation of instance data.
@@ -78,10 +80,10 @@ For this hypothesis, we generate two clusters centered around $(-0.5, \dots, -0.
 We similarly generate a random query.
 
 #+begin_src python :tangle hypotheses/hypothesis_1.py
-    query = np.random.uniform(-1.0, 1.0, (1, n_dims[i]))
+    queries = np.random.uniform(-1.0, 1.0, (sample_size, n_dims[i]))
 #+end_src
 
-Afterwards, we generate the flat index -- that is, an index that linearly scans -- on the sites and query against it. Its exhaustiveness guarantees detection of optimal solutions.
+Afterwards, we generate the flat index -- that is, an index that linearly scans -- on the sites and query against it. Its exhaustiveness guarantees detection of optimal solutions. Note that we pass all query vectors to the `index.search()` function for batch querying. Both results are now lists of solutions for each of the query vectors.
 
 #+begin_src python :tangle hypotheses/hypothesis_1.py
     time_start = time.perf_counter()
@@ -90,9 +92,11 @@ Afterwards, we generate the flat index -- that is, an index that linearly scans 
     time_end = time.perf_counter()
     print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
     time_start = time.perf_counter()
-    distance, solution = index.search(query, int(n_sites[i]))
+    distance, solution = index.search(queries, int(n_sites[i]))
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
+    print(f'\tDistances: {distance}')
+    print(f'\tSolutions: {solution}')
 #+end_src
 
 Finally, we write all the instance data to file under the dataset instance_i. This includes the number of sites generated, the dimensionality of the feature space, the query, as well as the solution. Note that we computed the exact ordering of all sites with respect to the nearest neighbor query, also called the /rank/. In order to determine, for a given sites $s$, what neighbor it is to the query, one needs to search the `ranks_i` list.
@@ -100,12 +104,12 @@ Finally, we write all the instance data to file under the dataset instance_i. Th
 Note that we materialize the three different views into the solution list, since supplying `file.create_dataset(..., data = solution[0][:k])` evaluates to the raw pointer, storing the solution list itself.
 
 #+begin_src python :tangle hypotheses/hypothesis_1.py
-    k_nearest = solution[0][:k]
-    ranks = solution[0]
-    k_nearest_distances = distance[0][:k]
+    k_nearest = list(map(lambda x: x[:k], solution))
+    ranks = solution
+    k_nearest_distances = list(map(lambda x: x[:k], distance))
 #+end_src
 
-In order to accelerate determination of the neighbor ordering $i$ of a site $s$, we invert the role of indices and values in the `ranks` list. Then, indexing into this list with the appropriate site $s$, which is merely an id, yields the desired $i$ in constant time. Otherwise, the list would need to be searched for the site $s$, drastically decreasing speed. Note that we increment the index by one. This ensures that ranks start at value one, which is important for plotting later on.
+In order to accelerate determination of the rank $i$ of a site $s$, we invert the role of indices and values in the `ranks` list. Then, indexing into this list with the appropriate site $s$, which is merely an id, yields the desired $i$ in constant time. Otherwise, the list would need to be searched for the site $s$, drastically decreasing speed. Note that we increment the index by one. This ensures that ranks start at value one, which is important for plotting later on.
 
 #+begin_src python :tangle hypotheses/hypothesis_1.py
     def invert(l):
@@ -116,7 +120,7 @@ In order to accelerate determination of the neighbor ordering $i$ of a site $s$,
 
         return new_l
 
-    ranks = invert(ranks)
+    ranks = list(map(invert, ranks))
 #+end_src
 
 
@@ -125,7 +129,7 @@ In order to accelerate determination of the neighbor ordering $i$ of a site $s$,
     instance.attrs['n_sites'] = n_sites[i]
     instance.attrs['n_dims'] = n_dims[i]
     instance.attrs['n_planes'] = n_dims[i] * 2
-    file.create_dataset('query_' + str(i), data=query)
+    file.create_dataset('queries_' + str(i), data=queries)
     file.create_dataset('solution_' + str(i), data=k_nearest)
     file.create_dataset('ranks_' + str(i), data = ranks)
     file.create_dataset('distance_' + str(i), data=k_nearest_distances)

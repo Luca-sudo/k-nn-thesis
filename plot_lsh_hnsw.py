@@ -21,6 +21,8 @@ plt.clf()
 
 sns.boxplot(data=ranks, x='instance', y='value', hue='algo')
 
+plt.yscale('log', base=2)
+
 plt.savefig(filepath + "_ranks.pdf")
 
 plt.clf()
