@@ -20,6 +20,7 @@ description = file.attrs['description']
 hypothesis = file.attrs['hypothesis']
 sample_size = file.attrs['sample_size']
 
+
 print(f'Hypothesis: {hypothesis}')
 print(f'Description: {description}')
 
@@ -116,20 +117,23 @@ for i in range(n_instances):
     hnsw_quality = optimal_distances / sorted_hnsw_distances
     print(f'hnsw_quality {hnsw_quality}')
 
+    var_name = file.attrs['var_name']
+    var_value = file.attrs['var_values'][i]
+
     for sample in lsh_quality:
         for q in sample:
                 qualities.append({
-                'instance' : i,
+                var_name : var_value,
                 'algo' : 'lsh',
-                'value' : q
+                'Quality' : q
                 })
 
     for sample in hnsw_quality:
         for q in sample:
                 qualities.append({
-                'instance' : i,
+                var_name : var_value,
                 'algo' : 'hnsw',
-                'value' : q
+                'Quality' : q
                 })
 
     current_lsh_ranks = []
@@ -138,23 +142,31 @@ for i in range(n_instances):
     for sample_idx, neighbors in enumerate(lsh_solutions):
         for r in site_to_rank[sample_idx][neighbors]:
                 ranks.append({
-                        'instance' : i,
+                        var_name : var_value,
                         'algo' : 'lsh',
-                        'value' : r
+                        'Rank' : r
                 })
 
     for sample_idx, neighbors in enumerate(hnsw_solutions):
         for r in site_to_rank[sample_idx][neighbors]:
                 ranks.append({
-                        'instance' : i,
+                        var_name : var_value,
                         'algo' : 'hnsw',
-                        'value' : r
+                        'Rank' : r
                 })
 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)
 ranks = pd.DataFrame(ranks)
 
-timings.to_csv(filepath + "_timings.csv")
-qualities.to_csv(filepath + "_qualities.csv")
-ranks.to_csv(filepath + "_ranks.csv")
+metadata = {
+    'var_name' : file.attrs['var_name']
+}
+
+timings.to_hdf(filepath + "_results.h5", key="timings", format="table")
+qualities.to_hdf(filepath + "_results.h5", key="qualities", format="table")
+ranks.to_hdf(filepath + "_results.h5", key="ranks", format="table")
+
+results = h5py.File(filepath + "_results.h5", 'r+')
+
+results.attrs['var_name'] = file.attrs['var_name']
