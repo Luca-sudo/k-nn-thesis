@@ -19,6 +19,7 @@
           matplotlib
           pandas
           seaborn
+          tables
 				];
 			};
 		}
