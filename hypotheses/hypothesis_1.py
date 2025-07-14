@@ -30,6 +30,8 @@ file.attrs['n_instances'] = len(n_sites)
 file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
+file.attrs['var_name'] = 'Number of Sites'
+file.attrs['var_values'] = n_sites
 
 for i in range(len(n_sites)):
 
