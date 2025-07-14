@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Hypothesis 4: The observed loss of quality in hypothesis 3 can be counteracted by increasing the number of separating hyperplanes.
+# Hypothesis 4: The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes.
 
 
 import time
@@ -15,7 +15,7 @@ n_planes = [i * n_dims for i in range(20)]
 sample_size = 20
 filepath = "data/hypothesis_4"
 
-hypothesis = "The observed loss of quality in hypothesis 3 can be counteracted by increasing the number of separating hyperplanes."
+hypothesis = "The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes."
 
 description = """
 Consider a uniform grid, akin to hypothesis 3, but this time with a fixed extent. Successive instances increase the number of separating hyperplanes.
