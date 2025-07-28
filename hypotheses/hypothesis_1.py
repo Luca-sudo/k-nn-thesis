@@ -17,8 +17,8 @@ description = '''
 We generate two clusters, centered at $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.5)$ respectively. These are hypercubes with a diameter of $0.4$. Put differently, for all sites $s = (s_1, \dots, s_d)$ in the first cluster, it holds that $-0.7 \leq s_i \leq -0.3$. For the second cluster this corresponds to $0.3 \leq s_i \leq 0.7$. Note that sites within each cluster are sampled uniformly.
 '''
 
-n_sites = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
-n_dims = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+n_sites = [2**i for i in range(11, 23)]
+n_dims = [100 for i in range(11, 23)]
 k = 5
 sample_size = 20
 
