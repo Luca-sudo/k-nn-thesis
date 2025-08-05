@@ -7,6 +7,7 @@ import time
 import numpy as np
 import h5py
 import faiss
+from functools import reduce
 
 if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to compare!")
@@ -27,6 +28,7 @@ print(f'Description: {description}')
 timings = []
 qualities = []
 ranks = []
+recalls = []
 
 for i in range(n_instances):
     print(f'Extracting instance {i}.')
@@ -46,8 +48,8 @@ for i in range(n_instances):
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
     time_start = time.perf_counter()
-    hnsw_index = faiss.IndexHNSWFlat(n_dim, 4)
-    hnsw_index.hnsw.efConstruction = 200
+    hnsw_index = faiss.IndexHNSWFlat(n_dim, 32)
+    hnsw_index.hnsw.efConstruction = 40
     hnsw_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -60,6 +62,7 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
+    hnsw_index.hnsw.efSearch = 32
     hnsw_distance, hnsw_solutions = hnsw_index.search(queries, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -155,9 +158,34 @@ for i in range(n_instances):
                         'Rank' : r
                 })
 
+    for sample_idx, neighbors in enumerate(lsh_solutions):
+        neighbor_count = 0
+        for r in site_to_rank[sample_idx][neighbors]:
+            if r <= k:
+                neighbor_count += 1
+        recalls.append({
+                var_name : var_value,
+                'algo' : 'lsh',
+                'Recall' : neighbor_count / k
+        })
+        print(f'LSH Recall for sample {sample_idx}: {neighbor_count / k}')
+
+    for sample_idx, neighbors in enumerate(hnsw_solutions):
+        neighbor_count = 0
+        for r in site_to_rank[sample_idx][neighbors]:
+            if r <= k:
+                neighbor_count += 1
+        recalls.append({
+                var_name : var_value,
+                'algo' : 'hnsw',
+                'Recall' : neighbor_count / k
+        })
+        print(f'HNSW Recall for sample {sample_idx}: {neighbor_count / k}')
+
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)
 ranks = pd.DataFrame(ranks)
+recalls = pd.DataFrame(recalls)
 
 metadata = {
     'var_name' : file.attrs['var_name']
@@ -166,6 +194,7 @@ metadata = {
 timings.to_hdf(filepath + "_results.h5", key="timings", format="table")
 qualities.to_hdf(filepath + "_results.h5", key="qualities", format="table")
 ranks.to_hdf(filepath + "_results.h5", key="ranks", format="table")
+recalls.to_hdf(filepath + "_results.h5", key="recalls", format="table")
 
 results = h5py.File(filepath + "_results.h5", 'r+')
 

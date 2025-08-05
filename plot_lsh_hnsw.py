@@ -9,10 +9,12 @@ if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to plot!")
 
 filepath, _ = os.path.splitext(sys.argv[1])
+filepath = filepath[:-8]
 
 qualities = pd.read_hdf(filepath + "_results.h5", key="qualities")
 timings = pd.read_hdf(filepath + "_results.h5", key="timings")
 ranks = pd.read_hdf(filepath + "_results.h5", key="ranks")
+recalls = pd.read_hdf(filepath + "_results.h5", key="recalls")
 
 results = h5py.File(filepath + "_results.h5", 'r')
 
@@ -36,3 +38,9 @@ plt.clf()
 sns.boxplot(data=timings, x='event', y='dt', hue='algo')
 
 plt.savefig(filepath + "_timings.pdf")
+
+plt.clf()
+
+sns.boxplot(data=recalls, x=var_name, y='Recall', hue='algo')
+
+plt.savefig(filepath + "_recalls.pdf")

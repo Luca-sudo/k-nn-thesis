@@ -22,6 +22,7 @@ import time
 import numpy as np
 import h5py
 import faiss
+from functools import reduce
 #+end_src
 
 With all libraries in place, we have to extract the filepath to the data from the CLI.
@@ -54,6 +55,7 @@ Before testing each instance, we setup lists for all data that we are interested
 timings = []
 qualities = []
 ranks = []
+recalls = []
 #+end_src
 
 Finally, we begin evaluating all instances. For this we extract the data, which includes the dimensionality, amount of sites, optimal solutions to the k-nearest neighbour query, etc.
@@ -81,8 +83,8 @@ With the instance data at hand, we now create the HNSW index and time it.
 
 #+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
-    hnsw_index = faiss.IndexHNSWFlat(n_dim, 4)
-    hnsw_index.hnsw.efConstruction = 200
+    hnsw_index = faiss.IndexHNSWFlat(n_dim, 32)
+    hnsw_index.hnsw.efConstruction = 40
     hnsw_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -99,6 +101,7 @@ We then query this HNSW index.
 
 #+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
+    hnsw_index.hnsw.efSearch = 32
     hnsw_distance, hnsw_solutions = hnsw_index.search(queries, k)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -196,6 +199,7 @@ Finally, we print and store the values of interest: minimum, median and maximum 
 
 Besides the quality, the rank of a candidate solution is of interest too. It is an integer $i$ that, for a given site $s$, denotes that $s$ is the $i$-th neighbor. To accelerate determining $i$, it suffices to index into the `ranks_i` list. At position $s$ of the `ranks_i` list -- note that faiss indices return index values into the original list of sites -- the corresponding $i$ can be extracted.
 
+# @TODO: Can both variables be deleted?
 #+begin_src python :tangle test_lsh_hnsw.py
     current_lsh_ranks = []
     current_hnsw_ranks = []
@@ -217,6 +221,36 @@ Besides the quality, the rank of a candidate solution is of interest too. It is 
                 })
 #+end_src
 
+Another important metric for approximative algorithms is their /recall/. The recall for a given query is a float between $0.0$ and $1.0$. It describes how many of the computed neighbors are true k-nearest neighbors, proportional to the query $k$. For example, if a 4-NN query computes two of the 4-nearest neighbors, then the recall would be $\frac{2}{4} = 0.5$.
+
+Most applications expect a recall above $0.9$ for optimal results, although some may be receptive to a recall of $0.7$ to $0.9$, although this depends on the specific use case.
+
+#+begin_src python :tangle test_lsh_hnsw.py
+    for sample_idx, neighbors in enumerate(lsh_solutions):
+        neighbor_count = 0
+        for r in site_to_rank[sample_idx][neighbors]:
+            if r <= k:
+                neighbor_count += 1
+        recalls.append({
+                var_name : var_value,
+                'algo' : 'lsh',
+                'Recall' : neighbor_count / k
+        })
+        print(f'LSH Recall for sample {sample_idx}: {neighbor_count / k}')
+
+    for sample_idx, neighbors in enumerate(hnsw_solutions):
+        neighbor_count = 0
+        for r in site_to_rank[sample_idx][neighbors]:
+            if r <= k:
+                neighbor_count += 1
+        recalls.append({
+                var_name : var_value,
+                'algo' : 'hnsw',
+                'Recall' : neighbor_count / k
+        })
+        print(f'HNSW Recall for sample {sample_idx}: {neighbor_count / k}')
+#+end_src
+
 :TODO: Add section on csv and plot generation.
 
 #+begin_src python :tangle test_lsh_hnsw.py
@@ -224,6 +258,7 @@ Besides the quality, the rank of a candidate solution is of interest too. It is 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)
 ranks = pd.DataFrame(ranks)
+recalls = pd.DataFrame(recalls)
 
 metadata = {
     'var_name' : file.attrs['var_name']
@@ -232,6 +267,7 @@ metadata = {
 timings.to_hdf(filepath + "_results.h5", key="timings", format="table")
 qualities.to_hdf(filepath + "_results.h5", key="qualities", format="table")
 ranks.to_hdf(filepath + "_results.h5", key="ranks", format="table")
+recalls.to_hdf(filepath + "_results.h5", key="recalls", format="table")
 
 results = h5py.File(filepath + "_results.h5", 'r+')
 
@@ -250,10 +286,12 @@ if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to plot!")
 
 filepath, _ = os.path.splitext(sys.argv[1])
+filepath = filepath[:-8]
 
 qualities = pd.read_hdf(filepath + "_results.h5", key="qualities")
 timings = pd.read_hdf(filepath + "_results.h5", key="timings")
 ranks = pd.read_hdf(filepath + "_results.h5", key="ranks")
+recalls = pd.read_hdf(filepath + "_results.h5", key="recalls")
 
 results = h5py.File(filepath + "_results.h5", 'r')
 
@@ -278,4 +316,9 @@ sns.boxplot(data=timings, x='event', y='dt', hue='algo')
 
 plt.savefig(filepath + "_timings.pdf")
 
+plt.clf()
+
+sns.boxplot(data=recalls, x=var_name, y='Recall', hue='algo')
+
+plt.savefig(filepath + "_recalls.pdf")
 #+end_src
