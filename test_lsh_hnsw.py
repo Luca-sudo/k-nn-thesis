@@ -191,11 +191,13 @@ metadata = {
     'var_name' : file.attrs['var_name']
 }
 
-timings.to_hdf(filepath + "_results.h5", key="timings", format="table")
-qualities.to_hdf(filepath + "_results.h5", key="qualities", format="table")
-ranks.to_hdf(filepath + "_results.h5", key="ranks", format="table")
-recalls.to_hdf(filepath + "_results.h5", key="recalls", format="table")
+target_path = filepath[:-3]
 
-results = h5py.File(filepath + "_results.h5", 'r+')
+timings.to_hdf(target_path + "_results.h5", key="timings", format="table")
+qualities.to_hdf(target_path + "_results.h5", key="qualities", format="table")
+ranks.to_hdf(target_path + "_results.h5", key="ranks", format="table")
+recalls.to_hdf(target_path + "_results.h5", key="recalls", format="table")
+
+results = h5py.File(target_path + "_results.h5", 'r+')
 
 results.attrs['var_name'] = file.attrs['var_name']
