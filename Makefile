@@ -10,18 +10,18 @@ HYPOTHESES = $(basename $(notdir $(wildcard hypotheses/*.py)))
 
 all: $(HYPOTHESES)
 
-hypothesis_%: hypotheses/hypothesis_%.py data/hypothesis_% data/hypothesis_%.csv data/hypothesis_%_qualities.pdf
+hypothesis_%: generate_hypothesis_% test_hypothesis_% plot_hypothesis_%
 	@echo 'Finished Generation & Evaluation of $@'
 
-data/hypothesis_%: hypotheses/hypothesis_%.py
+generate_hypothesis_%: hypotheses/hypothesis_%.py
 	@mkdir -p data
 	python3 $^
 
-data/hypothesis_%.csv: data/hypothesis_%
+test_hypothesis_%: data/hypothesis_%.h5
 	@mkdir -p evaluation
 	python3 test_lsh_hnsw.py $<
 
-data/hypothesis_%_qualities.pdf: data/hypothesis_%.csv data/hypothesis_%_results.h5
+plot_hypothesis_%:  data/hypothesis_%_results.h5
 	@mkdir -p plots
 	python3 plot_lsh_hnsw.py $<
 
