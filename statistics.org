@@ -1,0 +1,37 @@
+#+title: Statistics
+
+This program aims to compute key statistics from the available data, which includes variance and coefficient of variance.
+
+#+begin_src python :tangle statistics.py
+#!/usr/bin/env python3
+
+import sys
+import os
+import numpy as np
+import pandas as pd
+import h5py
+
+if(len(sys.argv) <= 1):
+    raise Exception("Please supply a filepath for data to plot!")
+
+filepath, _ = os.path.splitext(sys.argv[1])
+filepath = filepath[:-8]
+
+qualities = pd.read_hdf(filepath + "_results.h5", key="qualities")
+
+var_name = h5py.File(filepath + "_results.h5", 'r').attrs['var_name']
+
+deviations = qualities.groupby([var_name, 'algo'])['Quality'].std()
+
+mins = qualities.groupby([var_name, 'algo'])['Quality'].min()
+
+means = qualities.groupby([var_name, 'algo'])['Quality'].mean()
+
+maxs = qualities.groupby([var_name, 'algo'])['Quality'].max()
+
+print(deviations)
+print(mins)
+print(means)
+print(maxs)
+
+#+end_src
