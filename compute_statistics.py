@@ -10,7 +10,6 @@ if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to plot!")
 
 filepath, _ = os.path.splitext(sys.argv[1])
-filepath = filepath[:-8]
 
 qualities = pd.read_hdf(filepath + "_results.h5", key="qualities")
 
