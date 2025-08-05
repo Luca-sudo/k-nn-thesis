@@ -7,7 +7,7 @@ import numpy as np
 import h5py
 import faiss
 
-filepath = "data/hypothesis_1"
+filepath = "data/hypothesis_1.h5"
 
 np.random.seed(42)
 

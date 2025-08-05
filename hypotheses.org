@@ -26,7 +26,7 @@ import numpy as np
 import h5py
 import faiss
 
-filepath = "data/hypothesis_1"
+filepath = "data/hypothesis_1.h5"
 
 np.random.seed(42)
 
@@ -157,7 +157,7 @@ import numpy as np
 import h5py
 import faiss
 
-filepath = "data/hypothesis_2"
+filepath = "data/hypothesis_2.h5"
 
 hypothesis = "HNSW quality remains steady while LSH quality increases with growing spread."
 
@@ -278,7 +278,7 @@ n_dims = 2
 k = 5
 extents = [5, 10, 20, 30, 40, 50, 75, 100, 200, 300, 500]
 sample_size = 20
-filepath = "data/hypothesis_3"
+filepath = "data/hypothesis_3.h5"
 
 hypothesis = "HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions."
 
@@ -376,7 +376,7 @@ k = 5
 extent = 100
 n_planes = [i * n_dims for i in range(20)]
 sample_size = 20
-filepath = "data/hypothesis_4"
+filepath = "data/hypothesis_4.h5"
 
 hypothesis = "The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes."
 
@@ -463,7 +463,7 @@ n_dims = [i for i in range(2, 11)]
 k = 5
 extent = 5
 sample_size = 20
-filepath = "data/hypothesis_5"
+filepath = "data/hypothesis_5.h5"
 
 hypothesis = "Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases."
 
@@ -549,7 +549,7 @@ import faiss
 n_sites = [100, 1000, 5000, 10000, 50000, 100000, 500000, 100000]
 n_dims = [100 for i in range(len(n_sites))]
 k = 5
-filepath = "data/hypothesis_6"
+filepath = "data/hypothesis_6.h5"
 
 hypothesis = "Quality of LSH queries degenerates as density of sites increases."
 

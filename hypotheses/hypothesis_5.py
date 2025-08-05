@@ -12,7 +12,7 @@ n_dims = [i for i in range(2, 11)]
 k = 5
 extent = 5
 sample_size = 20
-filepath = "data/hypothesis_5"
+filepath = "data/hypothesis_5.h5"
 
 hypothesis = "Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases."
 

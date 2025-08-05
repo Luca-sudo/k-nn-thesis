@@ -13,7 +13,7 @@ k = 5
 extent = 100
 n_planes = [i * n_dims for i in range(20)]
 sample_size = 20
-filepath = "data/hypothesis_4"
+filepath = "data/hypothesis_4.h5"
 
 hypothesis = "The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes."
 

@@ -12,7 +12,7 @@ import faiss
 n_sites = [100, 1000, 5000, 10000, 50000, 100000, 500000, 100000]
 n_dims = [100 for i in range(len(n_sites))]
 k = 5
-filepath = "data/hypothesis_6"
+filepath = "data/hypothesis_6.h5"
 
 hypothesis = "Quality of LSH queries degenerates as density of sites increases."
 

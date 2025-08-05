@@ -7,7 +7,7 @@ import numpy as np
 import h5py
 import faiss
 
-filepath = "data/hypothesis_2"
+filepath = "data/hypothesis_2.h5"
 
 hypothesis = "HNSW quality remains steady while LSH quality increases with growing spread."
 

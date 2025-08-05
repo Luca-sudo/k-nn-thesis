@@ -11,7 +11,7 @@ n_dims = 2
 k = 5
 extents = [5, 10, 20, 30, 40, 50, 75, 100, 200, 300, 500]
 sample_size = 20
-filepath = "data/hypothesis_3"
+filepath = "data/hypothesis_3.h5"
 
 hypothesis = "HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions."
 
