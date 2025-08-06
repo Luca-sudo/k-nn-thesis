@@ -19,13 +19,13 @@ Both clusters allow for points within -0.2 and 0.2 range across all axes.
 
 np.random.seed(42)
 
-n_sites = 100000
+n_sites = 1000
 n_dims = 100
 k = 5
 sample_size = 20
 
 # This includes spreads up until (and including) $2^{20}$.
-spreads = [2.0 ** i for i in range(21)]
+spreads = [2.0 ** i for i in range(6, 30)]
 
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
@@ -40,10 +40,10 @@ for i in range(len(spreads)):
 
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
-    first_center = -(spreads[i] / 2.0)
-    second_center = (spreads[i] / 2.0)
-    first_cluster = np.random.uniform(first_center - 0.2, first_center + 0.2, (int(n_sites / 2), n_dims)) - 0.7
-    second_cluster = np.random.uniform(second_center - 0.2, second_center + 0.2, (int(n_sites / 2), n_dims)) + 0.3
+    first_center = 1.0
+    second_center = first_center + spreads[i]
+    first_cluster = np.random.uniform(first_center - 2.0, first_center + 2.0, (int(n_sites / 2), n_dims))
+    second_cluster = np.random.uniform(second_center - 2.0, second_center + 2.0, (int(n_sites / 2), n_dims))
     sites = first_cluster + second_cluster
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
