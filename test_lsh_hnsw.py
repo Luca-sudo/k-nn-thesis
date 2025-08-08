@@ -15,11 +15,14 @@ if(len(sys.argv) <= 1):
 filepath = sys.argv[1]
 
 file = h5py.File(filepath, 'r')
-k = file.attrs['k'].item()
-n_instances = file.attrs['n_instances']
+k = file.attrs['k'].astype(int).tolist()
+n_instances = file.attrs['n_instances'].astype(int).tolist()
+n_sites = file.attrs['n_sites'].astype(int).tolist()
 description = file.attrs['description']
 hypothesis = file.attrs['hypothesis']
 sample_size = file.attrs['sample_size']
+n_dims = file.attrs['n_dims'].astype(int).tolist()
+n_planes = file.attrs['n_planes'].astype(int).tolist()
 
 
 print(f'Hypothesis: {hypothesis}')
@@ -34,12 +37,9 @@ for i in range(n_instances):
     print(f'Extracting instance {i}.')
     time_start = time.perf_counter()
     dataset = file['instance_' + str(i)]
-    n_dim = dataset.attrs['n_dims'].item()
-    n_sites = dataset.attrs['n_sites']
-    n_planes = dataset.attrs['n_planes'].item()
     print('n_planes: ', n_planes)
     sites = dataset[()]
-    optimal_distances = file['distance_' + str(i)][()]
+    site_to_distance = file['distance_' + str(i)][()]
     site_to_rank = file['ranks_' + str(i)][()]
     queries = file['queries_' + str(i)][()]
     solution = file['solution_' + str(i)][()]
@@ -48,7 +48,7 @@ for i in range(n_instances):
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
     time_start = time.perf_counter()
-    hnsw_index = faiss.IndexHNSWFlat(n_dim, 32)
+    hnsw_index = faiss.IndexHNSWFlat(n_dims[i], 32)
     hnsw_index.hnsw.efConstruction = 40
     hnsw_index.add(sites)
     time_end = time.perf_counter()
@@ -63,7 +63,10 @@ for i in range(n_instances):
 
     time_start = time.perf_counter()
     hnsw_index.hnsw.efSearch = 32
-    hnsw_distance, hnsw_solutions = hnsw_index.search(queries, k)
+    print(type(queries))
+    print(type(k))
+    _, hnsw_solutions = hnsw_index.search(queries, k[i])
+
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
@@ -75,7 +78,7 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
-    lsh_index = faiss.IndexLSH(n_dim, n_planes)
+    lsh_index = faiss.IndexLSH(n_dims[i], n_planes[i])
     lsh_index.add(sites)
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
@@ -88,7 +91,7 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
-    _, lsh_solutions = lsh_index.search(queries, k)
+    _, lsh_solutions = lsh_index.search(queries, k[i])
     time_end = time.perf_counter()
     dt = round(time_end - time_start, 7)
     print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
@@ -99,26 +102,21 @@ for i in range(n_instances):
         'dt' : dt / sample_size
     })
 
-    print(f'\tLSH Solutions: {lsh_solutions}')
-    print(f'\tHNSW Solutions: {hnsw_solutions}')
-
     solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
     lsh_distance = []
     for sample_idx in range(sample_size):
-        print(sample_idx)
         sample = solution_vectors[sample_idx, :, :]
         distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
         lsh_distance.append(distances)
 
-    sorted_lsh_distances = lsh_distance
-    sorted_hnsw_distances = list(map(lambda x : sorted(x), hnsw_distance))
-    print(f'hnsw_distance: {hnsw_distance}')
-    print(f'hnsw_sorted_distance: {sorted_hnsw_distances}')
+    lsh_quality = []
+    hnsw_quality = []
+    for sample_idx in range(sample_size):
+        lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx]]))
+        hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][solution[sample_idx]]))
 
-    lsh_quality = optimal_distances / sorted_lsh_distances
-    print(f'lsh_quality {lsh_quality}')
-    hnsw_quality = optimal_distances / sorted_hnsw_distances
     print(f'hnsw_quality {hnsw_quality}')
+    print(f'lsh_quality {lsh_quality}')
 
     var_name = file.attrs['var_name']
     var_value = file.attrs['var_values'][i]
@@ -161,26 +159,24 @@ for i in range(n_instances):
     for sample_idx, neighbors in enumerate(lsh_solutions):
         neighbor_count = 0
         for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k:
+            if r <= k[i]:
                 neighbor_count += 1
         recalls.append({
                 var_name : var_value,
                 'algo' : 'lsh',
-                'Recall' : neighbor_count / k
+                'Recall' : neighbor_count / k[i]
         })
-        print(f'LSH Recall for sample {sample_idx}: {neighbor_count / k}')
 
     for sample_idx, neighbors in enumerate(hnsw_solutions):
         neighbor_count = 0
         for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k:
+            if r <= k[i]:
                 neighbor_count += 1
         recalls.append({
                 var_name : var_value,
                 'algo' : 'hnsw',
-                'Recall' : neighbor_count / k
+                'Recall' : neighbor_count / k[i]
         })
-        print(f'HNSW Recall for sample {sample_idx}: {neighbor_count / k}')
 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)

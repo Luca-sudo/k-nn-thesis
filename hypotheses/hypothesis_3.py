@@ -7,10 +7,6 @@ import numpy as np
 import h5py
 import faiss
 
-n_dims = 2
-k = 5
-extents = [5, 10, 20, 30, 40, 50, 75, 100, 200, 300, 500]
-sample_size = 20
 filepath = "data/hypothesis_3.h5"
 
 hypothesis = "HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions."
@@ -22,55 +18,76 @@ To this extent, all sites have the form $(i, j)$ with $i, j \in \mathbb{N}$ and 
 
 np.random.seed(42)
 
+extents = [int(2 ** i) for i in range(4, 10)]
+n_sites = [int(extents[i] ** 2) for i in range(len(extents))]
+n_dims = [int(2) for i in range(len(extents))]
+n_planes = [int(2 * dim) for dim in n_dims]
+k = [int(5) for i in range(len(extents))]
+sample_size = 20
+site_generator = lambda i: [(np.float64(x),np.float64(y)) for x in range(extents[i]) for y in range(extents[i])]
+query_generator = lambda i: np.random.uniform(0.0, extents[i] - 1.0, (sample_size, n_dims[i]))
+
+def invert(l):
+    new_l = [0 for i in range(len(l))]
+
+    for index, value in enumerate(l):
+        new_l[value] = index + 1
+
+    return new_l
+
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
-file.attrs['n_instances'] = len(extents)
+file.attrs['n_dims'] = n_dims
+file.attrs['n_sites'] = n_sites
+file.attrs['n_planes'] = n_planes
+file.attrs['var_name'] = "Extent"
+file.attrs['var_values'] = extents
+file.attrs['n_instances'] = len(n_sites)
 file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
-file.attrs['var_name'] = "Extent"
-file.attrs['var_values'] = extents
 
-for i in range(len(extents)):
+for i in range(len(n_sites)):
 
+    print(n_sites)
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
-    sites = [(x,y) for x in range(extents[i]) for y in range(extents[i])]
+    sites = site_generator(i)
     sites = np.array(sites, dtype=np.float32)
+    print(f'sites: {sites}')
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
 
-    queries = np.random.uniform(0, extents[i], (sample_size, n_dims))
+    queries = query_generator(i)
     time_start = time.perf_counter()
-    index = faiss.IndexFlatL2(n_dims)
+    index = faiss.IndexFlatL2(n_dims[i])
     index.add(sites)
     time_end = time.perf_counter()
     print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
 
     time_start = time.perf_counter()
-    distance, solution = index.search(queries, extents[i] ** 2)
+    distance, solution = index.search(queries, n_sites[i])
+
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
-    k_nearest = list(map(lambda x: x[:k], solution))
+    k_nearest = list(map(lambda x: x[:k[i]], solution))
     ranks = solution
-    k_nearest_distances = list(map(lambda x: x[:k], distance))
-
-    def invert(l):
-        new_l = [0 for i in range(len(l))]
-
-        for index, value in enumerate(l):
-            new_l[value] = index + 1
-
-        return new_l
+    print(ranks[0])
+    print(len(ranks[0]))
 
     ranks = list(map(invert, ranks))
 
+    site_to_distance = []
+    for sample_idx in range(sample_size):
+        temp = [0.0 for i in range(n_sites[i])]
+        for j in range(len(temp)):
+            site_idx = solution[sample_idx][j]
+            temp[site_idx] = distance[sample_idx][j]
+        site_to_distance.append(temp)
+
     instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = extents[i] ** 2
-    instance.attrs['n_dims'] = n_dims
-    instance.attrs['n_planes'] = n_dims * 2
     file.create_dataset('queries_' + str(i), data=queries)
     file.create_dataset('solution_' + str(i), data=k_nearest)
     file.create_dataset('ranks_' + str(i), data = ranks)
-    file.create_dataset('distance_' + str(i), data=k_nearest_distances)
+    file.create_dataset('distance_' + str(i), data=site_to_distance)
