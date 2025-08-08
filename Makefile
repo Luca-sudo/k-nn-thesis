@@ -25,6 +25,9 @@ plot_hypothesis_%:  data/hypothesis_%_results.h5
 	@mkdir -p plots
 	python3 plot_lsh_hnsw.py $<
 
+stats_hypothesis_%: data/hypothesis_%.h5
+	python3 compute_statistics.py $<
+
 .PHONY: clean
 
 clean:
