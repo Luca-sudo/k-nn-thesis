@@ -4,6 +4,9 @@ import numpy as np
 import h5py
 import faiss
 
+# Given a list that contains the ids of sites, invert populates a new list where the value at the id is the rank of the site.
+# If, for example, the site with id 5 was the nearest neighbor, then the resulting list would have value 1 at position 5.
+# This way, computing the ranks of candidate solutions is possible in constant time, at the cost of some memory.
 def invert(l):
     new_l = [0 for i in range(len(l))]
 
@@ -39,15 +42,12 @@ file.attrs['k'] = k
 file.attrs['n_dims'] = n_dims
 file.attrs['n_sites'] = n_sites
 file.attrs['n_planes'] = n_planes
-file.attrs['var_name'] = "Extent"
-file.attrs['var_values'] = extents
 file.attrs['n_instances'] = len(n_sites)
 file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
 
 for i in range(len(n_sites)):
-    print(n_sites)
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
     sites = site_generator(i)
@@ -88,3 +88,6 @@ for i in range(len(n_sites)):
     file.create_dataset('solution_' + str(i), data=k_nearest)
     file.create_dataset('ranks_' + str(i), data = ranks)
     file.create_dataset('distance_' + str(i), data=site_to_distance)
+
+file.attrs['var_name'] = "Extent"
+file.attrs['var_values'] = extents

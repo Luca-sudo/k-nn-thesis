@@ -4,6 +4,90 @@ This file serves as a literate program for the data generation of all hypotheses
 
 A literate program testing the generated data and evaluating aspects such as quality, performance, etc. can be found at `test_lsh_hnsw.org`. It, too, motivates portions of the source code.
 
+Before diving into the hypotheses, let us sketch two parts of data generation that are shared across the source code of all hypotheses: imports and the testing loop. Imports simply comprise all libraries that are shared across the data generation for all hypotheses, as well as a function `invert`, which we use to lookup the rank of a site.
+
+
+#+NAME: preamble
+#+BEGIN_SRC python :tangle no
+#!/usr/bin/env python3
+import time
+import numpy as np
+import h5py
+import faiss
+
+# Given a list that contains the ids of sites, invert populates a new list where the value at the id is the rank of the site.
+# If, for example, the site with id 5 was the nearest neighbor, then the resulting list would have value 1 at position 5.
+# This way, computing the ranks of candidate solutions is possible in constant time, at the cost of some memory.
+def invert(l):
+    new_l = [0 for i in range(len(l))]
+
+    for index, value in enumerate(l):
+        new_l[value] = index + 1
+
+    return new_l
+#+END_SRC
+
+The testing loop is more interesting. It starts of by defining key metadata about the data we generate. This is important when the data is tested in `test_lsh_hnsw.org`, as we have to know the structure of the data we deal with (i.e. how many sites are there, what is the dimensionality, etc).
+
+The for loop then generates the data and computes solutions for each instance. There are parts here which will be defined by the hypotheses themselves, such as `site_generator()` and `query_generator`. These functions simply generate the set of sites, and queries, for the specific instance. The remaining code inside of the for loop constructs a flat index for brute-force, orders all sites by their proximity to the query point, and stores results for each instance.
+
+#+NAME: test
+#+BEGIN_SRC python :tangle no
+file = h5py.File(filepath, 'w')
+file.attrs['k'] = k
+file.attrs['n_dims'] = n_dims
+file.attrs['n_sites'] = n_sites
+file.attrs['n_planes'] = n_planes
+file.attrs['n_instances'] = len(n_sites)
+file.attrs['description'] = description
+file.attrs['hypothesis'] = hypothesis
+file.attrs['sample_size'] = sample_size
+
+for i in range(len(n_sites)):
+    print(f'Generating instance {i}:')
+    time_start = time.perf_counter()
+    sites = site_generator(i)
+    sites = np.array(sites, dtype=np.float32)
+    print(f'sites: {sites}')
+    time_end = time.perf_counter()
+    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
+    queries = query_generator(i)
+    time_start = time.perf_counter()
+    index = faiss.IndexFlatL2(n_dims[i])
+    index.add(sites)
+    time_end = time.perf_counter()
+    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
+
+    time_start = time.perf_counter()
+    distance, solution = index.search(queries, n_sites[i])
+
+    time_end = time.perf_counter()
+    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
+
+    k_nearest = list(map(lambda x: x[:k[i]], solution))
+    ranks = solution
+    print(ranks[0])
+    print(len(ranks[0]))
+
+    ranks = list(map(invert, ranks))
+
+    site_to_distance = []
+    for sample_idx in range(sample_size):
+        temp = [0.0 for i in range(n_sites[i])]
+        for j in range(len(temp)):
+            site_idx = solution[sample_idx][j]
+            temp[site_idx] = distance[sample_idx][j]
+        site_to_distance.append(temp)
+
+    instance = file.create_dataset('instance_' + str(i), data=sites)
+    file.create_dataset('queries_' + str(i), data=queries)
+    file.create_dataset('solution_' + str(i), data=k_nearest)
+    file.create_dataset('ranks_' + str(i), data = ranks)
+    file.create_dataset('distance_' + str(i), data=site_to_distance)
+#+END_SRC
+
+The data-defining part of each hypothesis will live between these two shared components; after the imports and before the testing loop. This way, we avoid duplication and have a declarative definition of the instances for each hypothesis.
+
 * Hypothesis 1
 
 Conjecture: HNSW remains more precise than LSH on clustered data as the number of sites grows.
@@ -16,16 +100,10 @@ As is common with all test for LSH and HNSW, we evaluate the /quality/ of the so
 
 For the implementation: Of course, the usual preamble that imports required modules, defines a target path for the data to be generated, and seeds the RNG is required. For those running the script from the CLI, we also provide the hypothesis and a description of the test.
 
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-#!/usr/bin/env python3
+#+begin_src python :tangle hypotheses/hypothesis_1.py :noweb yes
+<<preamble>>
 
 # Hypothesis 1: HNSW remains more precise than LSH on clustered data as the number of sites grows.
-
-import time
-import numpy as np
-import h5py
-import faiss
-
 filepath = "data/hypothesis_1.h5"
 
 np.random.seed(42)
@@ -35,109 +113,22 @@ hypothesis = "HNSW remains more precise than LSH on clustered data as the number
 description = '''
 We generate two clusters, centered at $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.5)$ respectively. These are hypercubes with a diameter of $0.4$. Put differently, for all sites $s = (s_1, \dots, s_d)$ in the first cluster, it holds that $-0.7 \leq s_i \leq -0.3$. For the second cluster this corresponds to $0.3 \leq s_i \leq 0.7$. Note that sites within each cluster are sampled uniformly.
 '''
-#+end_src
 
-Afterwards, we define all instances through lists of parameters: the number of sites (n_sites), the dimensionality (n_dims), and the number of nearest neighbors to compute (k).
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
 n_sites = [2**i for i in range(11, 23)]
-n_dims = [100 for i in range(11, 23)]
-k = 5
+n_dims = [100 for i in n_sites]
+n_planes = [dim * 2 for dim in n_dims]
+k = [5 for i in n_sites]
 sample_size = 20
-#+end_src
+site_generator = lambda i: np.random.uniform(-0.7, -0.3, (int(n_sites[i] / 2), n_dims[i])) + np.random.uniform(0.3, 0.7, (int(n_sites[i] / 2), n_dims[i]))
+query_generator = lambda i: np.random.uniform(-1.0, 1.0, (sample_size, n_dims[i]))
 
-We then check that we have equally many values for n_sites and n_dims. Otherwise, we forgot to define our instances appropriately. Following this check, we already write the parameter k and the number of instances to our target file. We also write the brief description and hypothesis to the file already.
+<<test>>
 
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-assert(len(n_sites) == len(n_dims))
-
-file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
-file.attrs['n_instances'] = len(n_sites)
-file.attrs['description'] = description
-file.attrs['hypothesis'] = hypothesis
-file.attrs['sample_size'] = sample_size
-file.attrs['var_name'] = 'Number of Sites'
-file.attrs['var_values'] = n_sites
-#+end_src
-
-What follows now is the actual generation of instance data.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-for i in range(len(n_sites)):
-#+end_src
-
-For this hypothesis, we generate two clusters centered around $(-0.5, \dots, -0.5)$ and $(0.5, \dots, 0.5)$, and time this generation.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    print(f'Generating instance {i}:')
-    time_start = time.perf_counter()
-    first_cluster = np.random.uniform(-0.7, -0.3, (int(n_sites[i] / 2), n_dims[i]))
-    second_cluster = np.random.uniform(0.3, 0.7, (int(n_sites[i] / 2), n_dims[i]))
-    sites = first_cluster + second_cluster
-    time_end = time.perf_counter()
-    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-#+end_src
-
-We similarly generate a random query.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    queries = np.random.uniform(-1.0, 1.0, (sample_size, n_dims[i]))
-#+end_src
-
-Afterwards, we generate the flat index -- that is, an index that linearly scans -- on the sites and query against it. Its exhaustiveness guarantees detection of optimal solutions. Note that we pass all query vectors to the `index.search()` function for batch querying. Both results are now lists of solutions for each of the query vectors.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    time_start = time.perf_counter()
-    index = faiss.IndexFlatL2(n_dims[i])
-    index.add(sites)
-    time_end = time.perf_counter()
-    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
-    time_start = time.perf_counter()
-    distance, solution = index.search(queries, int(n_sites[i]))
-    time_end = time.perf_counter()
-    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
-    print(f'\tDistances: {distance}')
-    print(f'\tSolutions: {solution}')
-#+end_src
-
-Finally, we write all the instance data to file under the dataset instance_i. This includes the number of sites generated, the dimensionality of the feature space, the query, as well as the solution. Note that we computed the exact ordering of all sites with respect to the nearest neighbor query, also called the /rank/. In order to determine, for a given sites $s$, what neighbor it is to the query, one needs to search the `ranks_i` list.
-
-Note that we materialize the three different views into the solution list, since supplying `file.create_dataset(..., data = solution[0][:k])` evaluates to the raw pointer, storing the solution list itself.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    k_nearest = list(map(lambda x: x[:k], solution))
-    ranks = solution
-    k_nearest_distances = list(map(lambda x: x[:k], distance))
-#+end_src
-
-In order to accelerate determination of the rank $i$ of a site $s$, we invert the role of indices and values in the `ranks` list. Then, indexing into this list with the appropriate site $s$, which is merely an id, yields the desired $i$ in constant time. Otherwise, the list would need to be searched for the site $s$, drastically decreasing speed. Note that we increment the index by one. This ensures that ranks start at value one, which is important for plotting later on.
-
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    def invert(l):
-        new_l = [0 for i in range(len(l))]
-
-        for index, value in enumerate(l):
-            new_l[value] = index + 1
-
-        return new_l
-
-    ranks = list(map(invert, ranks))
+file.attrs['var_name'] = "Cluster Size"
+file.attrs['var_values'] = list(map(lambda x: x / 2, n_sites))
 #+end_src
 
 
-#+begin_src python :tangle hypotheses/hypothesis_1.py
-    instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = n_sites[i]
-    instance.attrs['n_dims'] = n_dims[i]
-    instance.attrs['n_planes'] = n_dims[i] * 2
-    file.create_dataset('queries_' + str(i), data=queries)
-    file.create_dataset('solution_' + str(i), data=k_nearest)
-    file.create_dataset('ranks_' + str(i), data = ranks)
-    file.create_dataset('distance_' + str(i), data=k_nearest_distances)
-#+end_src
-
-The test data can be generated with the associated Makefile, too. Run `make data/hypothesis_1` for that.
 
 * Hypothesis 2
 
@@ -262,26 +253,6 @@ Hypothesis: On a uniform grid (all sites have integer coordinates within a bound
 
 Method of evaluation: We generate a set of integer-coordinate sites within the two-dimensional square with some extent. This square has its lower-left corner at the origin. Across instances, the extent -- i.e. the region -- is increased horizontally and vertically. Every other parameter remains fixed throughout.
 
-We begin with the usual preamble:
-
-#+NAME: preamble
-#+BEGIN_SRC python :tangle no
-#!/usr/bin/env python3
-import time
-import numpy as np
-import h5py
-import faiss
-
-def invert(l):
-    new_l = [0 for i in range(len(l))]
-
-    for index, value in enumerate(l):
-        new_l[value] = index + 1
-
-    return new_l
-#+END_SRC
-
-
 #+BEGIN_SRC python :tangle hypotheses/hypothesis_3.py :noweb yes
 <<preamble>>
 
@@ -308,65 +279,11 @@ site_generator = lambda i: [(np.float64(x),np.float64(y)) for x in range(extents
 query_generator = lambda i: np.random.uniform(0.0, extents[i] - 1.0, (sample_size, n_dims[i]))
 
 <<test>>
-#+END_SRC
 
-#+NAME: test
-#+BEGIN_SRC python :tangle no
-file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
-file.attrs['n_dims'] = n_dims
-file.attrs['n_sites'] = n_sites
-file.attrs['n_planes'] = n_planes
 file.attrs['var_name'] = "Extent"
 file.attrs['var_values'] = extents
-file.attrs['n_instances'] = len(n_sites)
-file.attrs['description'] = description
-file.attrs['hypothesis'] = hypothesis
-file.attrs['sample_size'] = sample_size
-
-for i in range(len(n_sites)):
-    print(n_sites)
-    print(f'Generating instance {i}:')
-    time_start = time.perf_counter()
-    sites = site_generator(i)
-    sites = np.array(sites, dtype=np.float32)
-    print(f'sites: {sites}')
-    time_end = time.perf_counter()
-    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-    queries = query_generator(i)
-    time_start = time.perf_counter()
-    index = faiss.IndexFlatL2(n_dims[i])
-    index.add(sites)
-    time_end = time.perf_counter()
-    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
-
-    time_start = time.perf_counter()
-    distance, solution = index.search(queries, n_sites[i])
-
-    time_end = time.perf_counter()
-    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
-
-    k_nearest = list(map(lambda x: x[:k[i]], solution))
-    ranks = solution
-    print(ranks[0])
-    print(len(ranks[0]))
-
-    ranks = list(map(invert, ranks))
-
-    site_to_distance = []
-    for sample_idx in range(sample_size):
-        temp = [0.0 for i in range(n_sites[i])]
-        for j in range(len(temp)):
-            site_idx = solution[sample_idx][j]
-            temp[site_idx] = distance[sample_idx][j]
-        site_to_distance.append(temp)
-
-    instance = file.create_dataset('instance_' + str(i), data=sites)
-    file.create_dataset('queries_' + str(i), data=queries)
-    file.create_dataset('solution_' + str(i), data=k_nearest)
-    file.create_dataset('ranks_' + str(i), data = ranks)
-    file.create_dataset('distance_' + str(i), data=site_to_distance)
 #+END_SRC
+
 
 
 
