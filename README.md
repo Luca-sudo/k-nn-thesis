@@ -7,10 +7,12 @@
 - [x] Hypothesis 5: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
 - [x] Hypothesis 6: Quality of LSH queries degenerates as density of sites increases.
 - [ ] Hypothesis 7: Version of hypothesis 3 that translates grid by irrational number to avoid cosine similarity interference.
-- [ ] Hypothesis 8: Compare LSH & HNSW on Hypersphere. Should be LSH friendly by avoiding colinearity issues.
+- [X] Hypothesis 8: Compare LSH & HNSW on Hypersphere. Should be LSH friendly by avoiding colinearity issues.
 - [ ] Hypothesis ?: Compare Ball-Tree and k-d Tree 
 
 # TODO
-- [ ] Add ranks to LSH vs. HNSW plot
+- [X] Add ranks to LSH vs. HNSW plot
+- [X] Add recall to LSH vs. HNSW plot
+- [ ] Evaluate LSH and HNSW on practical datasets.
 
 
