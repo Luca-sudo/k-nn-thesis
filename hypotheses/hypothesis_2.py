@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-
-# Hypothesis 2: HNSW quality remains steady while LSH quality improves with increased spread (due to higher cosine similarity).
-
 import time
 import numpy as np
 import h5py
 import faiss
+
+# Given a list that contains the ids of sites, invert populates a new list where the value at the id is the rank of the site.
+# If, for example, the site with id 5 was the nearest neighbor, then the resulting list would have value 1 at position 5.
+# This way, computing the ranks of candidate solutions is possible in constant time, at the cost of some memory.
+def invert(l):
+    new_l = [0 for i in range(len(l))]
+
+    for index, value in enumerate(l):
+        new_l[value] = index + 1
+
+    return new_l
+
+# Hypothesis 2: HNSW quality remains steady while LSH quality improves with increased spread (due to higher cosine similarity).
 
 filepath = "data/hypothesis_2.h5"
 
@@ -13,72 +23,74 @@ hypothesis = "HNSW quality remains steady while LSH quality increases with growi
 
 description = """
 This test generates two clusters in the upper-right quadrant of the coordinate system.
-The center points of the clusters are chosen to be $-spread / 2.0$ and $spread / 2.0$ respectively.
+The center points of the clusters are chosen to be $1.0$ and $1.0 + spread$ respectively.
 Both clusters allow for points within -0.2 and 0.2 range across all axes.
 """
 
 np.random.seed(42)
 
-n_sites = 1000
-n_dims = 100
-k = 5
+spreads = [2.0 ** i for i in range(6, 50)]
+n_sites = [1000 for i in range(len(spreads))]
+n_dims = [100 for i in range(len(spreads))]
+n_planes = [2 * dim for dim in n_dims]
+k = [5 for i in range(len(spreads))]
 sample_size = 20
-
-# This includes spreads up until (and including) $2^{20}$.
-spreads = [2.0 ** i for i in range(6, 30)]
+first_center = [3.0 for i in spreads]
+second_center = [first_center[i] + spreads[i] for i in range(len(spreads))]
+site_generator = lambda i: np.random.uniform(first_center[i] - 2.0, first_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i])) + np.random.uniform(second_center[i] - 2.0, second_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i]))
+query_generator = lambda i: np.random.uniform(0.0, second_center[i] + 2.0, (sample_size, n_dims[i]))
 
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
-file.attrs['n_instances'] = len(spreads)
-file.attrs['hypothesis'] = hypothesis
+file.attrs['n_dims'] = n_dims
+file.attrs['n_sites'] = n_sites
+file.attrs['n_planes'] = n_planes
+file.attrs['n_instances'] = len(n_sites)
 file.attrs['description'] = description
+file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
-file.attrs['var_name'] = 'Spread'
-file.attrs['var_values'] = spreads
 
-for i in range(len(spreads)):
-
+for i in range(len(n_sites)):
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
-    first_center = 1.0
-    second_center = first_center + spreads[i]
-    first_cluster = np.random.uniform(first_center - 2.0, first_center + 2.0, (int(n_sites / 2), n_dims))
-    second_cluster = np.random.uniform(second_center - 2.0, second_center + 2.0, (int(n_sites / 2), n_dims))
-    sites = first_cluster + second_cluster
+    sites = site_generator(i)
+    sites = np.array(sites, dtype=np.float32)
+    print(f'sites: {sites}')
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-
-    queries = np.random.uniform(first_center, second_center, (sample_size, n_dims))
-
+    queries = query_generator(i)
     time_start = time.perf_counter()
-    index = faiss.IndexFlatL2(n_dims)
+    index = faiss.IndexFlatL2(n_dims[i])
     index.add(sites)
     time_end = time.perf_counter()
     print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
+
     time_start = time.perf_counter()
-    distance, solution = index.search(queries, n_sites)
+    distance, solution = index.search(queries, n_sites[i])
+
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
-    k_nearest = list(map(lambda x: x[:k], solution))
+    k_nearest = list(map(lambda x: x[:k[i]], solution))
     ranks = solution
-    k_nearest_distances = list(map(lambda x: x[:k], distance))
-
-    def invert(l):
-        new_l = [0 for i in range(len(l))]
-
-        for index, value in enumerate(l):
-            new_l[value] = index + 1
-
-        return new_l
+    print(ranks[0])
+    print(len(ranks[0]))
 
     ranks = list(map(invert, ranks))
 
+    site_to_distance = []
+    for sample_idx in range(sample_size):
+        temp = [0.0 for i in range(n_sites[i])]
+        for j in range(len(temp)):
+            site_idx = solution[sample_idx][j]
+            temp[site_idx] = distance[sample_idx][j]
+        site_to_distance.append(temp)
+
     instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = n_sites
-    instance.attrs['n_dims'] = n_dims
-    instance.attrs['n_planes'] = n_dims * 2
     file.create_dataset('queries_' + str(i), data=queries)
     file.create_dataset('solution_' + str(i), data=k_nearest)
     file.create_dataset('ranks_' + str(i), data = ranks)
-    file.create_dataset('distance_' + str(i), data=k_nearest_distances)
+    file.create_dataset('distance_' + str(i), data=site_to_distance)
+
+file.attrs['var_name'] = "Spread"
+file.attrs['var_values'] = spreads

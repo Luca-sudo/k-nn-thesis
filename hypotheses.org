@@ -138,15 +138,10 @@ Method of evaluation: All generated instances exhibit the same number of overall
 
 We begin with the usual preamble, importin modules, declaring target filepaths for to-be-generated data, etc.
 
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-#!/usr/bin/env python3
+#+begin_src python :tangle hypotheses/hypothesis_2.py :noweb yes
+<<preamble>>
 
 # Hypothesis 2: HNSW quality remains steady while LSH quality improves with increased spread (due to higher cosine similarity).
-
-import time
-import numpy as np
-import h5py
-import faiss
 
 filepath = "data/hypothesis_2.h5"
 
@@ -160,89 +155,21 @@ Both clusters allow for points within -0.2 and 0.2 range across all axes.
 
 np.random.seed(42)
 
-n_sites = 1000
-n_dims = 100
-k = 5
-sample_size = 20
-#+end_src
-
-Finally, we define a list of spreads, which correspond to the aforementioned distance between the centers cluster points.
-
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-# This includes spreads up until (and including) $2^{20}$.
 spreads = [2.0 ** i for i in range(6, 50)]
-#+end_src
+n_sites = [1000 for i in range(len(spreads))]
+n_dims = [100 for i in range(len(spreads))]
+n_planes = [2 * dim for dim in n_dims]
+k = [5 for i in range(len(spreads))]
+sample_size = 20
+first_center = [3.0 for i in spreads]
+second_center = [first_center[i] + spreads[i] for i in range(len(spreads))]
+site_generator = lambda i: np.random.uniform(first_center[i] - 2.0, first_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i])) + np.random.uniform(second_center[i] - 2.0, second_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i]))
+query_generator = lambda i: np.random.uniform(0.0, second_center[i] + 2.0, (sample_size, n_dims[i]))
 
-We then write attributes shared across all instances to the file and begin generating data for each instance.
+<<test>>
 
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
-file.attrs['n_instances'] = len(spreads)
-file.attrs['hypothesis'] = hypothesis
-file.attrs['description'] = description
-file.attrs['sample_size'] = sample_size
-file.attrs['var_name'] = 'Spread'
+file.attrs['var_name'] = "Spread"
 file.attrs['var_values'] = spreads
-
-for i in range(len(spreads)):
-#+end_src
-
-The first cluster is centered at $-2^{i-1}$, while the second cluster is centered at $2^{i - 1}$. Within each cluster, the sites are sampled uniformly, akin to the first hypothesis. Each clusters forms a hypoercube of diameter $0.4$. Our entire set of sites is made up of the first cluster and the second cluster.
-
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-    print(f'Generating instance {i}:')
-    time_start = time.perf_counter()
-    first_center = 1.0
-    second_center = first_center + spreads[i]
-    first_cluster = np.random.uniform(first_center - 2.0, first_center + 2.0, (int(n_sites / 2), n_dims))
-    second_cluster = np.random.uniform(second_center - 2.0, second_center + 2.0, (int(n_sites / 2), n_dims))
-    sites = first_cluster + second_cluster
-    time_end = time.perf_counter()
-    print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-#+end_src
-
-The query to benchmark is drawn uniformly too, but it samples coordinate values between $-2^{i-1}$ and $2^{i-1}$. This ensures that the query lies between both clusters and not inside one of them.
-
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-    queries = np.random.uniform(first_center, second_center, (sample_size, n_dims))
-#+end_src
-
-Finally, we create a flat index for exhaustive search, add the sites and compute the optimal k-nearest neighbors. All of which is stored in the file, before we move on to the next instance and repeat.
-
-#+begin_src python :tangle hypotheses/hypothesis_2.py
-    time_start = time.perf_counter()
-    index = faiss.IndexFlatL2(n_dims)
-    index.add(sites)
-    time_end = time.perf_counter()
-    print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
-    time_start = time.perf_counter()
-    distance, solution = index.search(queries, n_sites)
-    time_end = time.perf_counter()
-    print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
-
-    k_nearest = list(map(lambda x: x[:k], solution))
-    ranks = solution
-    k_nearest_distances = list(map(lambda x: x[:k], distance))
-
-    def invert(l):
-        new_l = [0 for i in range(len(l))]
-
-        for index, value in enumerate(l):
-            new_l[value] = index + 1
-
-        return new_l
-
-    ranks = list(map(invert, ranks))
-
-    instance = file.create_dataset('instance_' + str(i), data=sites)
-    instance.attrs['n_sites'] = n_sites
-    instance.attrs['n_dims'] = n_dims
-    instance.attrs['n_planes'] = n_dims * 2
-    file.create_dataset('queries_' + str(i), data=queries)
-    file.create_dataset('solution_' + str(i), data=k_nearest)
-    file.create_dataset('ranks_' + str(i), data = ranks)
-    file.create_dataset('distance_' + str(i), data=k_nearest_distances)
 #+end_src
 
 The data can be generated using `make data/hypothesis_2`.
