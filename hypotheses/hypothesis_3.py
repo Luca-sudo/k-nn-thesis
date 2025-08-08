@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-
-# Hypothesis 3: HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions.
-
 import time
 import numpy as np
 import h5py
 import faiss
 
+def invert(l):
+    new_l = [0 for i in range(len(l))]
+
+    for index, value in enumerate(l):
+        new_l[value] = index + 1
+
+    return new_l
+
+# Hypothesis 3: HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions.
 filepath = "data/hypothesis_3.h5"
 
 hypothesis = "HNSW remains precise on a uniform grid, whereas LSH degenerates due to cosine similarity collisions."
@@ -18,22 +24,15 @@ To this extent, all sites have the form $(i, j)$ with $i, j \in \mathbb{N}$ and 
 
 np.random.seed(42)
 
-extents = [int(2 ** i) for i in range(4, 10)]
-n_sites = [int(extents[i] ** 2) for i in range(len(extents))]
-n_dims = [int(2) for i in range(len(extents))]
-n_planes = [int(2 * dim) for dim in n_dims]
-k = [int(5) for i in range(len(extents))]
+# Define all relevant data
+extents = [(2 ** i) for i in range(4, 10)]
+n_sites = [(extents[i] ** 2) for i in range(len(extents))]
+n_dims = [2 for i in range(len(extents))]
+n_planes = [(2 * dim) for dim in n_dims]
+k = [5 for i in range(len(extents))]
 sample_size = 20
 site_generator = lambda i: [(np.float64(x),np.float64(y)) for x in range(extents[i]) for y in range(extents[i])]
 query_generator = lambda i: np.random.uniform(0.0, extents[i] - 1.0, (sample_size, n_dims[i]))
-
-def invert(l):
-    new_l = [0 for i in range(len(l))]
-
-    for index, value in enumerate(l):
-        new_l[value] = index + 1
-
-    return new_l
 
 file = h5py.File(filepath, 'w')
 file.attrs['k'] = k
@@ -48,7 +47,6 @@ file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
 
 for i in range(len(n_sites)):
-
     print(n_sites)
     print(f'Generating instance {i}:')
     time_start = time.perf_counter()
@@ -57,7 +55,6 @@ for i in range(len(n_sites)):
     print(f'sites: {sites}')
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-
     queries = query_generator(i)
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims[i])
