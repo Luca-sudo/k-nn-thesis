@@ -4,6 +4,7 @@ import time
 import numpy as np
 import h5py
 import faiss
+import sys
 
 # Given a list that contains the ids of sites, invert populates a new list where the value at the id is the rank of the site.
 # If, for example, the site with id 5 was the nearest neighbor, then the resulting list would have value 1 at position 5.
@@ -62,7 +63,9 @@ for i in range(len(n_sites)):
     time_end = time.perf_counter()
     print(f'\tGenerating flat index: {time_end - time_start:.3f} seconds')
 
+
     time_start = time.perf_counter()
+
     distance, solution = index.search(queries, n_sites[i])
 
     time_end = time.perf_counter()
