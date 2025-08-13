@@ -27,3 +27,9 @@ print(deviations)
 print(mins)
 print(means)
 print(maxs)
+
+recalls = pd.read_hdf(filepath + "_results.h5", key="recalls")
+
+print(recalls.groupby(['k', 'algo'])['Recall'].min())
+print(recalls.groupby(['k', 'algo'])['Recall'].mean())
+print(recalls.groupby(['k', 'algo'])['Recall'].max())
