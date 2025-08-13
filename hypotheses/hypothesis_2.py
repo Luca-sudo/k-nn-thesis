@@ -42,7 +42,7 @@ site_generator = lambda i: np.random.uniform(first_center[i] - 2.0, first_center
 query_generator = lambda i: np.random.uniform(0.0, second_center[i] + 2.0, (sample_size, n_dims[i]))
 
 file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
+file.attrs['max_k'] = max_k
 file.attrs['n_dims'] = n_dims
 file.attrs['n_sites'] = n_sites
 file.attrs['n_planes'] = n_planes
@@ -74,7 +74,7 @@ for i in range(len(n_sites)):
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
-    k_nearest = list(map(lambda x: x[:k[i]], solution))
+    k_nearest = list(map(lambda x: x[:max_k], solution))
     ranks = solution
     print(ranks[0])
     print(len(ranks[0]))

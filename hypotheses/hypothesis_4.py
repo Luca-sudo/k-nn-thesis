@@ -22,7 +22,7 @@ extent = 100
 n_dims = [2 for i in range(20)]
 n_planes = [i * n_dims[i] for i in range(len(n_dims))]
 n_sites = [extent ** n_dims[i] for i in range(len(n_dims))]
-k = [5 for i in range(len(n_dims))]
+max_k = 100
 sample_size = 20
 filepath = "data/hypothesis_4.h5"
 site_generator = lambda i: [(x,y) for x in range(extent) for y in range(extent)]
@@ -37,7 +37,7 @@ Consider a uniform grid, akin to hypothesis 3, but this time with a fixed extent
 np.random.seed(42)
 
 file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
+file.attrs['max_k'] = max_k
 file.attrs['n_dims'] = n_dims
 file.attrs['n_sites'] = n_sites
 file.attrs['n_planes'] = n_planes
@@ -69,7 +69,7 @@ for i in range(len(n_sites)):
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
-    k_nearest = list(map(lambda x: x[:k[i]], solution))
+    k_nearest = list(map(lambda x: x[:max_k], solution))
     ranks = solution
     print(ranks[0])
     print(len(ranks[0]))
