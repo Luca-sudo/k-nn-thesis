@@ -15,7 +15,8 @@ if(len(sys.argv) <= 1):
 filepath = sys.argv[1]
 
 file = h5py.File(filepath, 'r')
-k = file.attrs['k'].astype(int).tolist()
+max_k = file.attrs['max_k']
+k = [i for i in range(10, max_k, 10)]
 n_instances = file.attrs['n_instances'].astype(int).tolist()
 n_sites = file.attrs['n_sites'].astype(int).tolist()
 description = file.attrs['description']
@@ -62,22 +63,6 @@ for i in range(n_instances):
     })
 
     time_start = time.perf_counter()
-    hnsw_index.hnsw.efSearch = 32
-    print(type(queries))
-    print(type(k))
-    _, hnsw_solutions = hnsw_index.search(queries, k[i])
-
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'hnsw',
-        'event' : 'query',
-        'dt' : dt / sample_size
-    })
-
-    time_start = time.perf_counter()
     lsh_index = faiss.IndexLSH(n_dims[i], n_planes[i])
     lsh_index.add(sites)
     time_end = time.perf_counter()
@@ -90,93 +75,112 @@ for i in range(n_instances):
         'dt' : dt
     })
 
-    time_start = time.perf_counter()
-    _, lsh_solutions = lsh_index.search(queries, k[i])
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'lsh',
-        'event' : 'query',
-        'dt' : dt / sample_size
-    })
+    for k_i in k:
+        time_start = time.perf_counter()
+        hnsw_index.hnsw.efSearch = 32
+        _, hnsw_solutions = hnsw_index.search(queries, k_i)
 
-    solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
-    lsh_distance = []
-    for sample_idx in range(sample_size):
-        sample = solution_vectors[sample_idx, :, :]
-        distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
-        lsh_distance.append(distances)
-
-    lsh_quality = []
-    hnsw_quality = []
-    for sample_idx in range(sample_size):
-        lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx]]))
-        hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][solution[sample_idx]]))
-
-    print(f'hnsw_quality {hnsw_quality}')
-    print(f'lsh_quality {lsh_quality}')
-
-    var_name = file.attrs['var_name']
-    var_value = file.attrs['var_values'][i]
-
-    for sample in lsh_quality:
-        for q in sample:
-                qualities.append({
-                var_name : var_value,
-                'algo' : 'lsh',
-                'Quality' : q
-                })
-
-    for sample in hnsw_quality:
-        for q in sample:
-                qualities.append({
-                var_name : var_value,
+        time_end = time.perf_counter()
+        dt = round(time_end - time_start, 7)
+        print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+        timings.append({
+                'instance' : i,
                 'algo' : 'hnsw',
-                'Quality' : q
-                })
+                'event' : 'query',
+                'k' : k_i,
+                'dt' : dt / sample_size
+        })
 
-    current_lsh_ranks = []
-    current_hnsw_ranks = []
+        time_start = time.perf_counter()
+        _, lsh_solutions = lsh_index.search(queries, k_i)
+        time_end = time.perf_counter()
+        dt = round(time_end - time_start, 7)
+        print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+        timings.append({
+                'instance' : i,
+                'algo' : 'lsh',
+                'event' : 'query',
+                'k' : k_i,
+                'dt' : dt / sample_size
+        })
 
-    for sample_idx, neighbors in enumerate(lsh_solutions):
-        for r in site_to_rank[sample_idx][neighbors]:
-                ranks.append({
+        solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
+        lsh_distance = []
+        for sample_idx in range(sample_size):
+                sample = solution_vectors[sample_idx, :, :]
+                distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
+                lsh_distance.append(distances)
+
+        lsh_quality = []
+        hnsw_quality = []
+        for sample_idx in range(sample_size):
+                lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx][:k_i]]))
+                hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][solution[sample_idx][:k_i]]))
+
+        print(f'hnsw_quality {hnsw_quality}')
+        print(f'lsh_quality {lsh_quality}')
+
+        var_name = file.attrs['var_name']
+        var_value = file.attrs['var_values'][i]
+
+        for sample in lsh_quality:
+                for q in sample:
+                        qualities.append({
                         var_name : var_value,
                         'algo' : 'lsh',
-                        'Rank' : r
-                })
+                        'Quality' : q
+                        })
 
-    for sample_idx, neighbors in enumerate(hnsw_solutions):
-        for r in site_to_rank[sample_idx][neighbors]:
-                ranks.append({
+        for sample in hnsw_quality:
+                for q in sample:
+                        qualities.append({
                         var_name : var_value,
                         'algo' : 'hnsw',
-                        'Rank' : r
+                        'Quality' : q
+                        })
+
+        current_lsh_ranks = []
+        current_hnsw_ranks = []
+
+        for sample_idx, neighbors in enumerate(lsh_solutions):
+                for r in site_to_rank[sample_idx][neighbors]:
+                        ranks.append({
+                                var_name : var_value,
+                                'algo' : 'lsh',
+                                'Rank' : r
+                        })
+
+        for sample_idx, neighbors in enumerate(hnsw_solutions):
+                for r in site_to_rank[sample_idx][neighbors]:
+                        ranks.append({
+                                var_name : var_value,
+                                'algo' : 'hnsw',
+                                'Rank' : r
+                        })
+
+        for sample_idx, neighbors in enumerate(lsh_solutions):
+                neighbor_count = 0
+                for r in site_to_rank[sample_idx][neighbors]:
+                        if r <= k_i:
+                                neighbor_count += 1
+                recalls.append({
+                        var_name : var_value,
+                        'algo' : 'lsh',
+                        'Recall' : neighbor_count / k_i,
+                        'k' : k_i
                 })
 
-    for sample_idx, neighbors in enumerate(lsh_solutions):
-        neighbor_count = 0
-        for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k[i]:
-                neighbor_count += 1
-        recalls.append({
-                var_name : var_value,
-                'algo' : 'lsh',
-                'Recall' : neighbor_count / k[i]
-        })
-
-    for sample_idx, neighbors in enumerate(hnsw_solutions):
-        neighbor_count = 0
-        for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k[i]:
-                neighbor_count += 1
-        recalls.append({
+        for sample_idx, neighbors in enumerate(hnsw_solutions):
+                neighbor_count = 0
+                for r in site_to_rank[sample_idx][neighbors]:
+                        if r <= k_i:
+                                neighbor_count += 1
+                recalls.append({
                 var_name : var_value,
                 'algo' : 'hnsw',
-                'Recall' : neighbor_count / k[i]
-        })
+                'Recall' : neighbor_count / k_i,
+                'k' : k_i
+                })
 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)

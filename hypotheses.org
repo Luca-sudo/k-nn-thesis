@@ -35,7 +35,7 @@ The for loop then generates the data and computes solutions for each instance. T
 #+NAME: test
 #+BEGIN_SRC python :tangle no
 file = h5py.File(filepath, 'w')
-file.attrs['k'] = k
+file.attrs['max_k'] = max_k
 file.attrs['n_dims'] = n_dims
 file.attrs['n_sites'] = n_sites
 file.attrs['n_planes'] = n_planes
@@ -67,7 +67,7 @@ for i in range(len(n_sites)):
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
-    k_nearest = list(map(lambda x: x[:k[i]], solution))
+    k_nearest = list(map(lambda x: x[:max_k], solution))
     ranks = solution
     print(ranks[0])
     print(len(ranks[0]))
@@ -203,7 +203,7 @@ extents = [(2 ** i) for i in range(4, 10)]
 n_sites = [(extents[i] ** 2) for i in range(len(extents))]
 n_dims = [2 for i in range(len(extents))]
 n_planes = [(2 * dim) for dim in n_dims]
-k = [5 for i in range(len(extents))]
+max_k = 100
 sample_size = 20
 site_generator = lambda i: [(np.float64(x),np.float64(y)) for x in range(extents[i]) for y in range(extents[i])]
 query_generator = lambda i: np.random.uniform(0.0, extents[i] - 1.0, (sample_size, n_dims[i]))

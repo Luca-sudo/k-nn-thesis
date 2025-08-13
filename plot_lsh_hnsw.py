@@ -46,3 +46,9 @@ plt.clf()
 sns.boxplot(data=recalls, x=var_name, y='Recall', hue='algo')
 
 plt.savefig(plot_path + "_recalls.pdf")
+
+plt.clf()
+
+sns.lineplot(data=recalls, x='k', y='Recall', hue='algo')
+
+plt.savefig(plot_path + "_recalls@.pdf")

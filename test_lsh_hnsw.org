@@ -38,7 +38,8 @@ We then read the first parameters of the test data -- such as the number of inst
 
 #+begin_src python :tangle test_lsh_hnsw.py
 file = h5py.File(filepath, 'r')
-k = file.attrs['k'].astype(int).tolist()
+max_k = file.attrs['max_k']
+k = [i for i in range(10, max_k, 10)]
 n_instances = file.attrs['n_instances'].astype(int).tolist()
 n_sites = file.attrs['n_sites'].astype(int).tolist()
 description = file.attrs['description']
@@ -79,7 +80,7 @@ for i in range(n_instances):
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 #+end_src
 
-With the instance data at hand, we now create the HNSW index and time it.
+With the instance data at hand, we now create the HNSW and the LSH index, timing both.
 
 #+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
@@ -95,29 +96,7 @@ With the instance data at hand, we now create the HNSW index and time it.
         'event' : 'creation',
         'dt' : dt
     })
-#+end_src
 
-We then query this HNSW index.
-
-#+begin_src python :tangle test_lsh_hnsw.py
-    time_start = time.perf_counter()
-    hnsw_index.hnsw.efSearch = 32
-    _, hnsw_solutions = hnsw_index.search(queries, k[i])
-
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'hnsw',
-        'event' : 'query',
-        'dt' : dt / sample_size
-    })
-#+end_src
-
-Afterwards, we create the LSH index and query it too.
-
-#+begin_src python :tangle test_lsh_hnsw.py
     time_start = time.perf_counter()
     lsh_index = faiss.IndexLSH(n_dims[i], n_planes[i])
     lsh_index.add(sites)
@@ -130,66 +109,89 @@ Afterwards, we create the LSH index and query it too.
         'event' : 'creation',
         'dt' : dt
     })
+#+end_src
 
-    time_start = time.perf_counter()
-    _, lsh_solutions = lsh_index.search(queries, k[i])
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'lsh',
-        'event' : 'query',
-        'dt' : dt / sample_size
-    })
+We then query this HNSW index.
+
+#+begin_src python :tangle test_lsh_hnsw.py
+    for k_i in k:
+        time_start = time.perf_counter()
+        hnsw_index.hnsw.efSearch = 32
+        _, hnsw_solutions = hnsw_index.search(queries, k_i)
+
+        time_end = time.perf_counter()
+        dt = round(time_end - time_start, 7)
+        print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+        timings.append({
+                'instance' : i,
+                'algo' : 'hnsw',
+                'event' : 'query',
+                'k' : k_i,
+                'dt' : dt / sample_size
+        })
+#+end_src
+
+#+begin_src python :tangle test_lsh_hnsw.py
+        time_start = time.perf_counter()
+        _, lsh_solutions = lsh_index.search(queries, k_i)
+        time_end = time.perf_counter()
+        dt = round(time_end - time_start, 7)
+        print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+        timings.append({
+                'instance' : i,
+                'algo' : 'lsh',
+                'event' : 'query',
+                'k' : k_i,
+                'dt' : dt / sample_size
+        })
 #+end_src
 
 Before we can evaluate the quality of the LSH index, we have to calculate the distances for candidate solutions manually. While the HNSW index returned euclidean distances together with the set of candidate solutions, LSH returns the hamming distance instead. We, therefore, calculate the euclidean distances for all LSH candidate solutions.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-    solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
-    lsh_distance = []
-    for sample_idx in range(sample_size):
-        sample = solution_vectors[sample_idx, :, :]
-        distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
-        lsh_distance.append(distances)
+        solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
+        lsh_distance = []
+        for sample_idx in range(sample_size):
+                sample = solution_vectors[sample_idx, :, :]
+                distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
+                lsh_distance.append(distances)
 #+end_src
 
 Next, we sort the resulting distances of both HNSW and LSH from best to worst, before we calculate the quality of the respective solutions. We define the quality of a candidate solution relative to the optimal solution through the formula $\frac{\text{Optimal Distance}}{\text{Achieved Distance}}$. Hence, the quality of a candidate is $1$ if it is precisely the optimal solution. In any other case, the quality approaches zero as the realized distance worsens.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-    lsh_quality = []
-    hnsw_quality = []
-    for sample_idx in range(sample_size):
-        lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx]]))
-        hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx]] / sorted(site_to_distance[sample_idx][solution[sample_idx]]))
+        lsh_quality = []
+        hnsw_quality = []
+        for sample_idx in range(sample_size):
+                lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx][:k_i]]))
+                hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][solution[sample_idx][:k_i]]))
 
-    print(f'hnsw_quality {hnsw_quality}')
-    print(f'lsh_quality {lsh_quality}')
+        print(f'hnsw_quality {hnsw_quality}')
+        print(f'lsh_quality {lsh_quality}')
 #+end_src
 
 Finally, we print and store the values of interest: minimum, median and maximum quality for both HNSW and LSH.
 
 
 #+begin_src python :tangle test_lsh_hnsw.py
-    var_name = file.attrs['var_name']
-    var_value = file.attrs['var_values'][i]
+        var_name = file.attrs['var_name']
+        var_value = file.attrs['var_values'][i]
 
-    for sample in lsh_quality:
-        for q in sample:
-                qualities.append({
-                var_name : var_value,
-                'algo' : 'lsh',
-                'Quality' : q
-                })
+        for sample in lsh_quality:
+                for q in sample:
+                        qualities.append({
+                        var_name : var_value,
+                        'algo' : 'lsh',
+                        'Quality' : q
+                        })
 
-    for sample in hnsw_quality:
-        for q in sample:
-                qualities.append({
-                var_name : var_value,
-                'algo' : 'hnsw',
-                'Quality' : q
-                })
+        for sample in hnsw_quality:
+                for q in sample:
+                        qualities.append({
+                        var_name : var_value,
+                        'algo' : 'hnsw',
+                        'Quality' : q
+                        })
 
 #+end_src
 
@@ -197,24 +199,24 @@ Besides the quality, the rank of a candidate solution is of interest too. It is 
 
 # @TODO: Can both variables be deleted?
 #+begin_src python :tangle test_lsh_hnsw.py
-    current_lsh_ranks = []
-    current_hnsw_ranks = []
+        current_lsh_ranks = []
+        current_hnsw_ranks = []
 
-    for sample_idx, neighbors in enumerate(lsh_solutions):
-        for r in site_to_rank[sample_idx][neighbors]:
-                ranks.append({
-                        var_name : var_value,
-                        'algo' : 'lsh',
-                        'Rank' : r
-                })
+        for sample_idx, neighbors in enumerate(lsh_solutions):
+                for r in site_to_rank[sample_idx][neighbors]:
+                        ranks.append({
+                                var_name : var_value,
+                                'algo' : 'lsh',
+                                'Rank' : r
+                        })
 
-    for sample_idx, neighbors in enumerate(hnsw_solutions):
-        for r in site_to_rank[sample_idx][neighbors]:
-                ranks.append({
-                        var_name : var_value,
-                        'algo' : 'hnsw',
-                        'Rank' : r
-                })
+        for sample_idx, neighbors in enumerate(hnsw_solutions):
+                for r in site_to_rank[sample_idx][neighbors]:
+                        ranks.append({
+                                var_name : var_value,
+                                'algo' : 'hnsw',
+                                'Rank' : r
+                        })
 #+end_src
 
 Another important metric for approximative algorithms is their /recall/. The recall for a given query is a float between $0.0$ and $1.0$. It describes how many of the computed neighbors are true k-nearest neighbors, proportional to the query $k$. For example, if a 4-NN query computes two of the 4-nearest neighbors, then the recall would be $\frac{2}{4} = 0.5$.
@@ -222,27 +224,29 @@ Another important metric for approximative algorithms is their /recall/. The rec
 Most applications expect a recall above $0.9$ for optimal results, although some may be receptive to a recall of $0.7$ to $0.9$, although this depends on the specific use case.
 
 #+begin_src python :tangle test_lsh_hnsw.py
-    for sample_idx, neighbors in enumerate(lsh_solutions):
-        neighbor_count = 0
-        for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k[i]:
-                neighbor_count += 1
-        recalls.append({
-                var_name : var_value,
-                'algo' : 'lsh',
-                'Recall' : neighbor_count / k[i]
-        })
+        for sample_idx, neighbors in enumerate(lsh_solutions):
+                neighbor_count = 0
+                for r in site_to_rank[sample_idx][neighbors]:
+                        if r <= k_i:
+                                neighbor_count += 1
+                recalls.append({
+                        var_name : var_value,
+                        'algo' : 'lsh',
+                        'Recall' : neighbor_count / k_i,
+                        'k' : k_i
+                })
 
-    for sample_idx, neighbors in enumerate(hnsw_solutions):
-        neighbor_count = 0
-        for r in site_to_rank[sample_idx][neighbors]:
-            if r <= k[i]:
-                neighbor_count += 1
-        recalls.append({
+        for sample_idx, neighbors in enumerate(hnsw_solutions):
+                neighbor_count = 0
+                for r in site_to_rank[sample_idx][neighbors]:
+                        if r <= k_i:
+                                neighbor_count += 1
+                recalls.append({
                 var_name : var_value,
                 'algo' : 'hnsw',
-                'Recall' : neighbor_count / k[i]
-        })
+                'Recall' : neighbor_count / k_i,
+                'k' : k_i
+                })
 #+end_src
 
 :TODO: Add section on csv and plot generation.
@@ -319,4 +323,10 @@ plt.clf()
 sns.boxplot(data=recalls, x=var_name, y='Recall', hue='algo')
 
 plt.savefig(plot_path + "_recalls.pdf")
+
+plt.clf()
+
+sns.lineplot(data=recalls, x='k', y='Recall', hue='algo')
+
+plt.savefig(plot_path + "_recalls@.pdf")
 #+end_src
