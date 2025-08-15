@@ -16,6 +16,7 @@
 					faiss
 					numpy
 					h5py
+					scikit-learn
           matplotlib
           pandas
           seaborn
