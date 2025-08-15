@@ -23,7 +23,7 @@ extent = 5
 n_dims = [i for i in range(2, 10)]
 n_planes = [dim * 2 for dim in n_dims]
 n_sites = [5 ** dim for dim in n_dims]
-k = [5 for i in range(len(n_dims))]
+max_k = 100
 sample_size = 20
 site_generator = lambda i: [s for s in itertools.product(range(extent), repeat=n_dims[i])]
 query_generator = lambda i: np.random.uniform(0, extent, (sample_size, n_dims[i]))

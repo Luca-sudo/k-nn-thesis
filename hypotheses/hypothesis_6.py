@@ -21,7 +21,7 @@ def invert(l):
 n_sites = [2 ** i for i in range(10, 20)]
 n_dims = [100 for i in range(len(n_sites))]
 n_planes = [dim * 2 for dim in n_dims]
-k = [5 for i in range(len(n_sites))]
+max_k = 100
 sample_size = 20
 filepath = "data/hypothesis_6.h5"
 site_generator = lambda i: np.random.uniform(-1.0, 1.0, (n_sites[i], n_dims[i]))
