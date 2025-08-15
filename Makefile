@@ -24,6 +24,9 @@ test_hypothesis_%: data/hypothesis_%.h5
 test_sift1m: data/sift1m.h5
 	python3 test_sift1m.py $<
 
+test_gist1m: data/gist1m.h5
+	python3 test_sift1m.py $<
+
 plot_%:  data/%_results.h5
 	@mkdir -p plots
 	python3 plot_lsh_hnsw.py $<
