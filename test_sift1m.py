@@ -116,7 +116,7 @@ for i in range(n_instances):
         hnsw_quality = []
         for sample_idx in range(CHUNK_SIZE):
             lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx][:k_i]]))
-            hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][solution[sample_idx][:k_i]]))
+            hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][hnsw_solutions[sample_idx][:k_i]]))
 
         print(f'hnsw_quality {hnsw_quality}')
         print(f'lsh_quality {lsh_quality}')
