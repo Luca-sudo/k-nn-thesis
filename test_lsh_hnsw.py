@@ -8,6 +8,8 @@ import numpy as np
 import h5py
 import faiss
 from functools import reduce
+from sklearn.neighbors import KDTree, BallTree
+from enum import Enum
 
 if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to compare!")
@@ -34,7 +36,169 @@ qualities = []
 ranks = []
 recalls = []
 
+class DS(Enum):
+    LSH = 1
+    HNSW = 2
+    KD = 3
+    BT = 4
+
+def BT(sample_size):
+    return (DS.BT, sample_size)
+
+def KD(sample_size):
+    return (DS.KD, sample_size)
+
+def HNSW(sample_size):
+    return (DS.HNSW, sample_size)
+
+def LSH(sample_size):
+    return (DS.LSH, sample_size)
+
+def to_string(ds):
+    match ds[0]:
+        case DS.LSH:
+            return 'lsh'
+        case DS.HNSW:
+            return 'hnsw'
+        case DS.KD:
+            return f'kd@{ds[1]}'
+        case DS.BT:
+            return f'bt@{ds[1]}'
+
+ds_to_test = [
+    LSH(1.0),
+    HNSW(1.0),
+    KD(0.2),
+    KD(0.4),
+    KD(0.6),
+    KD(0.8),
+    KD(1.0),
+    BT(0.2),
+    BT(0.4),
+    BT(0.6),
+    BT(0.8),
+    BT(1.0)
+]
+
+def create_index(ds, sites, n_dims, n_planes):
+    index = 0
+    match ds[0]:
+        case DS.LSH:
+            time_start = time.perf_counter()
+            index = faiss.IndexLSH(n_dims, n_planes)
+            index.add(sites)
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : 'lsh',
+                'event' : 'creation',
+                'dt' : dt
+            })
+        case DS.HNSW:
+            time_start = time.perf_counter()
+            index = faiss.IndexHNSWFlat(n_dims, 32)
+            index.hnsw.efConstruction = 40
+            index.add(sites)
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : 'hnsw',
+                'event' : 'creation',
+                'dt' : dt
+            })
+        case DS.KD:
+            time_start = time.perf_counter()
+            rand_samples = np.random.choice(len(sites), int(len(sites) * ds[1]), replace=False)
+            index = KDTree(sites[rand_samples], leaf_size=30, metric='euclidean')
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            print(f'\tCreating KD-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : to_string(ds),
+                'event' : 'creation',
+                'dt' : dt
+            })
+        case DS.BT:
+            time_start = time.perf_counter()
+            rand_samples = np.random.choice(len(sites), int(len(sites) * ds[1]), replace=False)
+            index = BallTree(sites[rand_samples], leaf_size=30, metric='euclidean')
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            print(f'\tCreating Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : to_string(ds),
+                'event' : 'creation',
+                'dt' : dt
+            })
+    return index
+
+def search_index(index, ds, queries, k_i, instance_num):
+    index_solutions = 0
+    match ds[0]:
+        case DS.LSH:
+            time_start = time.perf_counter()
+            time_end = time.perf_counter()
+            index_solutions = index.search(queries, k_i)[1]
+            dt = round(time_end - time_start, 7)
+            #print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : 'lsh',
+                'event' : 'query',
+                'dt' : dt / len(queries)
+            })
+        case DS.HNSW:
+            time_start = time.perf_counter()
+            index.hnsw.efSearch = 32
+            _, index_solutions = index.search(queries, k_i)
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            #print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                    'instance' : i,
+                    'algo' : 'hnsw',
+                    'event' : 'query',
+                    'k' : k_i,
+                    'dt' : dt / len(queries)
+            })
+        case DS.KD:
+            time_start = time.perf_counter()
+            index_solutions = index.query(queries, k=k_i, return_distance=False)
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            #print(f'\tQuerying KD-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : f'kd@{ds[1]}',
+                'event' : 'query',
+                'dt' : dt / len(queries)
+            })
+        case DS.BT:
+            time_start = time.perf_counter()
+            index_solutions = index.query(queries, k=k_i, return_distance=False)
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : f'bt@{ds[1]}',
+                'event' : 'query',
+                'dt' : dt / len(queries)
+            })
+    return index_solutions
+
+
+var_name = file.attrs['var_name']
+
 for i in range(n_instances):
+    var_value = file.attrs['var_values'][i]
+
     print(f'Extracting instance {i}.')
     time_start = time.perf_counter()
     dataset = file['instance_' + str(i)]
@@ -48,139 +212,41 @@ for i in range(n_instances):
     dt = round(time_end - time_start, 7)
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
-    time_start = time.perf_counter()
-    hnsw_index = faiss.IndexHNSWFlat(n_dims[i], 32)
-    hnsw_index.hnsw.efConstruction = 40
-    hnsw_index.add(sites)
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'hnsw',
-        'event' : 'creation',
-        'dt' : dt
-    })
+    for ds in ds_to_test:
+        index = create_index(ds, sites, n_dims[i], n_planes[i])
 
-    time_start = time.perf_counter()
-    lsh_index = faiss.IndexLSH(n_dims[i], n_planes[i])
-    lsh_index.add(sites)
-    time_end = time.perf_counter()
-    dt = round(time_end - time_start, 7)
-    print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
-    timings.append({
-        'instance' : i,
-        'algo' : 'lsh',
-        'event' : 'creation',
-        'dt' : dt
-    })
-
-    for k_i in k:
-        time_start = time.perf_counter()
-        hnsw_index.hnsw.efSearch = 32
-        _, hnsw_solutions = hnsw_index.search(queries, k_i)
-
-        time_end = time.perf_counter()
-        dt = round(time_end - time_start, 7)
-        print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
-        timings.append({
-                'instance' : i,
-                'algo' : 'hnsw',
-                'event' : 'query',
-                'k' : k_i,
-                'dt' : dt / sample_size
-        })
-
-        time_start = time.perf_counter()
-        _, lsh_solutions = lsh_index.search(queries, k_i)
-        time_end = time.perf_counter()
-        dt = round(time_end - time_start, 7)
-        print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
-        timings.append({
-                'instance' : i,
-                'algo' : 'lsh',
-                'event' : 'query',
-                'k' : k_i,
-                'dt' : dt / sample_size
-        })
-
-        solution_vectors = np.array(list(map(lambda x : sites[x], lsh_solutions)))
-        lsh_distance = []
-        for sample_idx in range(sample_size):
-                sample = solution_vectors[sample_idx, :, :]
-                distances = sorted(np.sum((sample - queries[sample_idx]) ** 2, axis=1))
-                lsh_distance.append(distances)
-
-        lsh_quality = []
-        hnsw_quality = []
-        for sample_idx in range(sample_size):
-                lsh_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][lsh_solutions[sample_idx][:k_i]]))
-                hnsw_quality.append(site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][hnsw_solutions[sample_idx][:k_i]]))
-
-        print(f'hnsw_quality {hnsw_quality}')
-        print(f'lsh_quality {lsh_quality}')
-
-        var_name = file.attrs['var_name']
-        var_value = file.attrs['var_values'][i]
-
-        for sample in lsh_quality:
-                for q in sample:
-                        qualities.append({
+        for k_i in k:
+            index_solutions = search_index(index, ds, queries, k_i, i)
+            for sample_idx in range(sample_size):
+                sample_qualities = site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][index_solutions[sample_idx][:k_i]])
+                for q in sample_qualities:
+                    qualities.append({
                         var_name : var_value,
-                        'algo' : 'lsh',
+                        'algo' : to_string(ds),
                         'Quality' : q
-                        })
+                    })
 
-        for sample in hnsw_quality:
-                for q in sample:
-                        qualities.append({
-                        var_name : var_value,
-                        'algo' : 'hnsw',
-                        'Quality' : q
-                        })
+            for sample_idx, neighbors in enumerate(index_solutions):
+                    for r in site_to_rank[sample_idx][neighbors]:
+                            ranks.append({
+                                    var_name : var_value,
+                                    'algo' : to_string(ds),
+                                    'Rank' : r
+                            })
 
-        current_lsh_ranks = []
-        current_hnsw_ranks = []
 
-        for sample_idx, neighbors in enumerate(lsh_solutions):
-                for r in site_to_rank[sample_idx][neighbors]:
-                        ranks.append({
-                                var_name : var_value,
-                                'algo' : 'lsh',
-                                'Rank' : r
-                        })
+            for sample_idx, neighbors in enumerate(index_solutions):
+                    neighbor_count = 0
+                    for r in site_to_rank[sample_idx][neighbors]:
+                            if r <= k_i:
+                                    neighbor_count += 1
+                    recalls.append({
+                            var_name : var_value,
+                            'algo' : to_string(ds),
+                            'Recall' : neighbor_count / k_i,
+                            'k' : k_i
+                    })
 
-        for sample_idx, neighbors in enumerate(hnsw_solutions):
-                for r in site_to_rank[sample_idx][neighbors]:
-                        ranks.append({
-                                var_name : var_value,
-                                'algo' : 'hnsw',
-                                'Rank' : r
-                        })
-
-        for sample_idx, neighbors in enumerate(lsh_solutions):
-                neighbor_count = 0
-                for r in site_to_rank[sample_idx][neighbors]:
-                        if r <= k_i:
-                                neighbor_count += 1
-                recalls.append({
-                        var_name : var_value,
-                        'algo' : 'lsh',
-                        'Recall' : neighbor_count / k_i,
-                        'k' : k_i
-                })
-
-        for sample_idx, neighbors in enumerate(hnsw_solutions):
-                neighbor_count = 0
-                for r in site_to_rank[sample_idx][neighbors]:
-                        if r <= k_i:
-                                neighbor_count += 1
-                recalls.append({
-                var_name : var_value,
-                'algo' : 'hnsw',
-                'Recall' : neighbor_count / k_i,
-                'k' : k_i
-                })
 
 timings = pd.DataFrame(timings)
 qualities = pd.DataFrame(qualities)
