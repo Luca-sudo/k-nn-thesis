@@ -1,24 +1,25 @@
 import pandas as pd
 import h5py
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import seaborn as sns
 import os
 import sys
 
 algo_to_color = {
-    'lsh' : '66c2a5',
-    'hnsw' : 'fc8d62',
-    'kd@0.2' : 'f0f1f2',
-    'kd@0.4' : 'dbe7ed',
-    'kd@0.6' : 'c6dde9',
-    'kd@0.8' : 'b2d3e5',
-    'kd@1.0' : '9dcae1',
-    'bt@0.2' : 'f3f0ef',
-    'bt@0.4' : 'f5dfce',
-    'bt@0.6' : 'f8cfac',
-    'bt@0.8' : 'fabe8b',
-    'bt@1.0' : 'fdae6a',
-    'rand sampling' : '8da0cb'
+    'lsh' : '#d62728',
+    'hnsw' : '#9467bd',
+    'kd@0.2' : '#7cbce9',
+    'kd@0.4' : '#51a6e1',
+    'kd@0.6' : '#2590da',
+    'kd@0.8' : '#1e73ae',
+    'kd@1.0' : '#165683',
+    'bt@0.2' : '#ffae66',
+    'bt@0.4' : '#ff9333',
+    'bt@0.6' : '#ff7800',
+    'bt@0.8' : '#cc6000',
+    'bt@1.0' : '#994800',
+    'rand sampling' : '#2ca02c'
 }
 
 if(len(sys.argv) <= 1):
@@ -39,13 +40,23 @@ print(f'var_name : {var_name}')
 
 plot_path = "plots/" + filepath[5:]
 
-sns.lineplot(data=qualities, x=var_name, y='Quality', hue='algo')
+sns.lineplot(data=qualities, x=var_name, y='Quality', hue='algo', palette=algo_to_color, legend=False)
 
 plt.savefig(plot_path + "_qualities.pdf")
 
 plt.clf()
 
-sns.boxplot(data=ranks, x=var_name, y='Rank', hue='algo')
+fig, ax = plt.subplots()
+
+sns.boxplot(data=ranks, x='algo', y='Rank', hue='instance', legend=False, ax=ax)
+
+ax.set(xlabel='Instances per Algorithm')
+ax.set_xticklabels([])
+
+# Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
+colors = list(algo_to_color.values())
+for patch_idx, patch in enumerate(ax.patches):
+    patch.set_facecolor(colors[patch_idx % len(colors)])
 
 plt.yscale('log', base=2)
 
@@ -53,18 +64,28 @@ plt.savefig(plot_path + "_ranks.pdf")
 
 plt.clf()
 
-sns.boxplot(data=timings, x='event', y='dt', hue='algo')
+sns.boxplot(data=timings, x='event', y='dt', hue='algo', palette=algo_to_color, legend=False)
 
 plt.savefig(plot_path + "_timings.pdf")
 
 plt.clf()
 
-sns.boxplot(data=recalls, x=var_name, y='Recall', hue='algo')
+fig, ax = plt.subplots()
+
+sns.boxplot(data=recalls, x='algo', y='Recall', hue='instance', legend=False, ax=ax)
+
+ax.set(xlabel='Instances per Algorithm')
+ax.set_xticklabels([])
+
+# Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
+colors = list(algo_to_color.values())
+for patch_idx, patch in enumerate(ax.patches):
+    patch.set_facecolor(colors[patch_idx % len(colors)])
 
 plt.savefig(plot_path + "_recalls.pdf")
 
 plt.clf()
 
-sns.lineplot(data=recalls, x='k', y='Recall', hue='algo')
+sns.lineplot(data=recalls, x='k', y='Recall', hue='algo', palette=algo_to_color, legend=False)
 
 plt.savefig(plot_path + "_recalls@.pdf")
