@@ -5,6 +5,22 @@ import seaborn as sns
 import os
 import sys
 
+algo_to_color = {
+    'lsh' : '66c2a5',
+    'hnsw' : 'fc8d62',
+    'kd@0.2' : 'f0f1f2',
+    'kd@0.4' : 'dbe7ed',
+    'kd@0.6' : 'c6dde9',
+    'kd@0.8' : 'b2d3e5',
+    'kd@1.0' : '9dcae1',
+    'bt@0.2' : 'f3f0ef',
+    'bt@0.4' : 'f5dfce',
+    'bt@0.6' : 'f8cfac',
+    'bt@0.8' : 'fabe8b',
+    'bt@1.0' : 'fdae6a',
+    'rand sampling' : '8da0cb'
+}
+
 if(len(sys.argv) <= 1):
     raise Exception("Please supply a filepath for data to plot!")
 
