@@ -1,6 +1,8 @@
 import pandas as pd
 import math
 import h5py
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import seaborn as sns
@@ -56,7 +58,7 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=ranks, x='algo', y='Rank', hue='instance', legend=False, ax=ax)
+sns.boxplot(data=ranks, x='algo', y='Rank', hue='instance', legend=False, fliersize=0)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])
@@ -106,7 +108,7 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=recalls, x='algo', y='Recall', hue='instance', legend=False, ax=ax)
+sns.boxplot(data=recalls, x='algo', y='Recall', hue='instance', legend=False, ax=ax, showfliers=False)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])

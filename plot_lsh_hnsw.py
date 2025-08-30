@@ -1,4 +1,5 @@
 import pandas as pd
+import math
 import h5py
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -36,11 +37,18 @@ recalls = pd.read_hdf(filepath + "_results.h5", key="recalls")
 results = h5py.File(filepath + "_results.h5", 'r')
 
 var_name = results.attrs['var_name']
-print(f'var_name : {var_name}')
+var_values = results.attrs['var_values'][()]
 
 plot_path = "plots/" + filepath[5:]
 
-sns.lineplot(data=qualities, x=var_name, y='Quality', hue='algo', palette=algo_to_color, legend=False)
+fig, ax = plt.subplots()
+
+sns.lineplot(data=qualities, x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
+
+ax.set(xlabel=var_name)
+pos = range(len(var_values))
+labels = [f'$2^{{{int(math.log2(v))}}}$' for v in var_values]
+plt.xticks(pos, labels)
 
 plt.savefig(plot_path + "_qualities.pdf")
 
@@ -64,9 +72,35 @@ plt.savefig(plot_path + "_ranks.pdf")
 
 plt.clf()
 
-sns.boxplot(data=timings, x='event', y='dt', hue='algo', palette=algo_to_color, legend=False)
+fig, ax = plt.subplots()
 
-plt.savefig(plot_path + "_timings.pdf")
+sns.lineplot(data=timings[(timings['event'] == 'creation') & (timings['algo'] != 'rand sampling')], x='instance', y='dt', hue='algo', palette=algo_to_color, legend=False, ax=ax)
+
+ax.set_ylabel('Time in Seconds')
+ax.set(xlabel=var_name)
+pos = range(len(var_values))
+labels = [f'$2^{{{int(math.log2(v))}}}$' for v in var_values]
+plt.xticks(pos, labels)
+
+plt.yscale('log', base=2)
+
+plt.savefig(plot_path + "_timings_creation.pdf")
+
+plt.clf()
+
+fig, ax = plt.subplots()
+
+sns.lineplot(data=timings[(timings['event'] == 'query') & (timings['algo'] != 'rand sampling')], x='instance', y='dt', hue='algo', palette=algo_to_color, legend=False, ax=ax)
+
+ax.set_ylabel('Time in Seconds')
+ax.set(xlabel=var_name)
+pos = range(len(var_values))
+labels = [f'$2^{{{int(math.log2(v))}}}$' for v in var_values]
+plt.xticks(pos, labels)
+
+plt.yscale('log', base=2)
+
+plt.savefig(plot_path + "_timings_query.pdf")
 
 plt.clf()
 
