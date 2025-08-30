@@ -10,6 +10,8 @@ HYPOTHESES = $(basename $(notdir $(wildcard hypotheses/*.py)))
 
 all: $(HYPOTHESES)
 
+run: plot_hypothesis_5 generate_hypothesis_6 test_hypothesis_6 plot_hypothesis_6 generate_hypothesis_7 test_hypothesis_7 plot_hypothesis_7
+
 hypothesis_%: generate_hypothesis_% test_hypothesis_% plot_hypothesis_%
 	@echo 'Finished Generation & Evaluation of $@'
 
@@ -22,14 +24,13 @@ test_hypothesis_%: data/hypothesis_%.h5
 	python3 test_lsh_hnsw.py $<
 
 test_sift1m: data/sift1m.h5
-	python3 test_sift1m.py $<
+	python3 test_lsh_hnsw.py $<
 
 test_gist1m: data/gist1m.h5
 	python3 test_sift1m.py $<
 
-plot_%:  data/%_results.h5
-	@mkdir -p plots
-	python3 plot_lsh_hnsw.py $<
+plot_hypothesis_%: plotting/plot_hypothesis_%.py data/hypothesis_%_results.h5
+	python3 $^
 
 stats_%: data/%.h5
 	python3 compute_statistics.py $<
