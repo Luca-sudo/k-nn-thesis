@@ -260,17 +260,21 @@ for i in range(n_instances):
                 continue
             index_solutions = search_index(index, ds, rand_sample, queries, k_i, i)
             for sample_idx in range(sample_size):
-                sample_qualities = site_to_distance[sample_idx][solution[sample_idx][:k_i]] / sorted(site_to_distance[sample_idx][index_solutions[sample_idx][:k_i]])
+                solution_distances = site_to_distance[sample_idx][solution[sample_idx][:k_i]]
+                sample_distances = sorted(site_to_distance[sample_idx][index_solutions[sample_idx][:k_i]])
+                sample_qualities = solution_distances / sample_distances
                 for q in sample_qualities:
                     qualities.append({
+                        'instance' : i,
                         var_name : var_value,
                         'algo' : to_string(ds),
-                        'Quality' : 0.0 if np.isnan(q) else q
+                        'Quality' : float(solution_distances[q_idx] == sample_distances[q_idx]) if np.isnan(q) else q
                     })
 
             for sample_idx, neighbors in enumerate(index_solutions):
                     for r in site_to_rank[sample_idx][neighbors]:
                             ranks.append({
+                                    'instance' : i,
                                     var_name : var_value,
                                     'algo' : to_string(ds),
                                     'Rank' : r
@@ -283,6 +287,7 @@ for i in range(n_instances):
                             if r <= k_i:
                                     neighbor_count += 1
                     recalls.append({
+                            'instance' : i,
                             var_name : var_value,
                             'algo' : to_string(ds),
                             'Recall' : neighbor_count / k_i,
@@ -309,3 +314,4 @@ recalls.to_hdf(target_path + "_results.h5", key="recalls", format="table")
 results = h5py.File(target_path + "_results.h5", 'r+')
 
 results.attrs['var_name'] = file.attrs['var_name']
+results.attrs['var_values'] = file.attrs['var_values']
