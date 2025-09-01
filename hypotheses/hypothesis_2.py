@@ -30,16 +30,19 @@ Both clusters allow for points within -0.2 and 0.2 range across all axes.
 
 np.random.seed(42)
 
-spreads = [2.0 ** i for i in range(6, 50)]
-n_sites = [1000 for i in range(len(spreads))]
+spreads = [2.0 ** i for i in range(1, 15)]
+n_sites = [10000 for i in range(len(spreads))]
 n_dims = [100 for i in range(len(spreads))]
 n_planes = [2 * dim for dim in n_dims]
 max_k = 100
-sample_size = 20
+sample_size = 22
 first_center = [3.0 for i in spreads]
 second_center = [first_center[i] + spreads[i] for i in range(len(spreads))]
-site_generator = lambda i: np.random.uniform(first_center[i] - 2.0, first_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i])) + np.random.uniform(second_center[i] - 2.0, second_center[i] + 2.0, (int(n_sites[i] / 2), n_dims[i]))
-query_generator = lambda i: np.random.uniform(0.0, second_center[i] + 2.0, (sample_size, n_dims[i]))
+print(f'first_center: {first_center}')
+print(f'second_center: {second_center}')
+site_generator = lambda iteration: np.concatenate([np.random.uniform(first_center[iteration] - 2.0, first_center[iteration] + 2.0, (int(n_sites[iteration] / 2), n_dims[iteration])), np.random.uniform(second_center[iteration] - 2.0, second_center[iteration] + 2.0, (int(n_sites[iteration] / 2), n_dims[iteration]))])
+query_generator = lambda iteration: np.concatenate([np.random.uniform(first_center[iteration] - 2.0, first_center[iteration] + 2.0, (int(sample_size / 2), n_dims[iteration])), np.random.uniform(second_center[iteration] - 2.0, second_center[iteration] + 2.0, (int(sample_size / 2), n_dims[iteration]))])
+
 
 file = h5py.File(filepath, 'w')
 file.attrs['max_k'] = max_k
@@ -60,6 +63,8 @@ for i in range(len(n_sites)):
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
     queries = query_generator(i)
+    queries = np.array(queries, dtype=np.float32)
+    print(f'Iteration {i}; queries {queries}')
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims[i])
     index.add(sites)
