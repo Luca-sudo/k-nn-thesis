@@ -32,7 +32,7 @@ n_dims = [100 for i in n_sites]
 n_planes = [dim * 2 for dim in n_dims]
 max_k = 100
 sample_size = 20
-site_generator = lambda i: np.random.uniform(-0.7, -0.3, (int(n_sites[i] / 2), n_dims[i])) + np.random.uniform(0.3, 0.7, (int(n_sites[i] / 2), n_dims[i]))
+site_generator = lambda i: np.concat([np.random.uniform(-0.7, -0.3, (int(n_sites[i] / 2), n_dims[i])), np.random.uniform(0.3, 0.7, (int(n_sites[i] / 2), n_dims[i]))])
 query_generator = lambda i: np.random.uniform(-1.0, 1.0, (sample_size, n_dims[i]))
 
 file = h5py.File(filepath, 'w')
