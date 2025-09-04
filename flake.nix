@@ -10,19 +10,25 @@
 	flake-utils.lib.eachDefaultSystem(system:
 		let
 			pkgs = nixpkgs.legacyPackages.${system};
+			
 		in{
 			devShell = pkgs.mkShell {
 				buildInputs = with pkgs.python311Packages; [
 					faiss
+					hnswlib
 					numpy
 					h5py
 					scikit-learn
-          matplotlib
-          pandas
-          seaborn
-          tables
-				];
+					matplotlib
+					pandas
+					seaborn
+					tables
+				]; 
+				
+				venvDir = ".venv";
+
 			};
+
 		}
 	);
 }

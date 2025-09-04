@@ -73,16 +73,21 @@ for i in range(len(n_sites)):
 
 
     time_start = time.perf_counter()
+    distance = []
+    solution = []
+    for q in queries:
+        d, s = index.search(np.atleast_2d(q), n_sites[i])
+        distance.append(d[0])
+        solution.append(s[0])
 
-    distance, solution = index.search(queries, n_sites[i])
-
+    distance = np.asarray(distance)
+    solution = np.asarray(solution)
     time_end = time.perf_counter()
     print(f'\tComputing solution: {time_end - time_start:.3f} seconds')
 
+    print(f'distance {distance}')
     k_nearest = list(map(lambda x: x[:max_k], solution))
     ranks = solution
-    print(ranks[0])
-    print(len(ranks[0]))
 
     ranks = list(map(invert, ranks))
 
