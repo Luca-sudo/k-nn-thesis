@@ -20,7 +20,8 @@ algo_to_color = {
     'bt@0.6' : '#ff7800',
     'bt@0.8' : '#cc6000',
     'bt@1.0' : '#994800',
-    'rand sampling' : '#2ca02c'
+    'rand sampling' : '#2ca02c',
+    'bruteforce' : '#DFF954'
 }
 
 if(len(sys.argv) <= 1):
@@ -41,6 +42,8 @@ var_values = results.attrs['var_values'][()]
 
 plot_path = "plots/" + filepath[5:]
 
+excluded_algos = ['rand sampling', 'bruteforce', 'bt@1.0', 'kd@1.0']
+
 fig, ax = plt.subplots()
 
 sns.lineplot(data=qualities, x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
@@ -56,7 +59,20 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=ranks, x='algo', y='Rank', hue='instance', legend=False, ax=ax, showfliers=False)
+sns.lineplot(data=qualities[~qualities['algo'].isin(excluded_algos)], x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
+
+ax.set(xlabel=var_name)
+pos = range(len(var_values))
+labels = [f'$2^{{{int(math.log2(v))}}}$' for v in var_values]
+plt.xticks(pos, labels)
+
+plt.savefig(plot_path + "_qualities_no_exact_algos.pdf")
+
+plt.clf()
+
+fig, ax = plt.subplots()
+
+sns.boxplot(data=ranks[~ranks['algo'].isin(excluded_algos)], x='algo', y='Rank', hue='instance', legend=False, ax=ax, showfliers=False)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])
@@ -64,7 +80,7 @@ ax.set_xticklabels([])
 # Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
 colors = list(algo_to_color.values())
 for patch_idx, patch in enumerate(ax.patches):
-    patch.set_facecolor(colors[patch_idx % len(colors)])
+    patch.set_facecolor(colors[patch_idx % (len(colors) - len(excluded_algos))])
 
 plt.yscale('log', base=2)
 
@@ -106,7 +122,8 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=recalls, x='algo', y='Recall', hue='instance', legend=False, ax=ax, showfliers=False)
+
+sns.boxplot(data=recalls[~recalls['algo'].isin(excluded_algos)], x='algo', y='Recall', hue='instance', legend=False, ax=ax, showfliers=False)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])
@@ -114,12 +131,12 @@ ax.set_xticklabels([])
 # Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
 colors = list(algo_to_color.values())
 for patch_idx, patch in enumerate(ax.patches):
-    patch.set_facecolor(colors[patch_idx % len(colors)])
+    patch.set_facecolor(colors[patch_idx % (len(colors) - len(excluded_algos))])
 
 plt.savefig(plot_path + "_recalls.pdf")
 
 plt.clf()
 
-sns.lineplot(data=recalls, x='k', y='Recall', hue='algo', palette=algo_to_color, legend=False)
+sns.lineplot(data=recalls[~recalls['algo'].isin(['rand sampling', 'bruteforce', 'bt@1.0', 'kd@1.0'])], x='k', y='Recall', hue='algo', palette=algo_to_color, legend=False)
 
 plt.savefig(plot_path + "_recalls@.pdf")
