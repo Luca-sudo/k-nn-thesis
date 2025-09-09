@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
+import math
 import pandas as pd
 import seaborn as sns
 import sys
@@ -7,6 +8,8 @@ import time
 import numpy as np
 import h5py
 import faiss
+import lshashpy3
+import hnswlib
 from functools import reduce
 from sklearn.neighbors import KDTree, BallTree
 from enum import Enum
@@ -42,6 +45,7 @@ class DS(Enum):
     KD = 3
     BT = 4
     RS = 5
+    BRUTE = 6
 
 def BT(sample_size):
     return (DS.BT, sample_size)
@@ -59,6 +63,9 @@ def LSH(sample_size):
 def RS(sample_size):
     return (DS.RS, sample_size)
 
+def BRUTE(sample_size):
+    return (DS.BRUTE, sample_size)
+
 def to_string(ds):
     match ds[0]:
         case DS.LSH:
@@ -71,6 +78,8 @@ def to_string(ds):
             return f'bt@{ds[1]}'
         case DS.RS:
             return f'rand sampling'
+        case DS.BRUTE:
+            return 'bruteforce'
 
 ds_to_test = [
     LSH(1.0),
@@ -85,7 +94,8 @@ ds_to_test = [
     BT(0.6),
     BT(0.8),
     BT(1.0),
-    RS(1.0)
+    RS(1.0),
+    BRUTE(1.0)
 ]
 
 def create_index(ds, sites, n_dims, n_planes):
@@ -96,8 +106,12 @@ def create_index(ds, sites, n_dims, n_planes):
     match ds[0]:
         case DS.LSH:
             time_start = time.perf_counter()
-            index = faiss.IndexLSH(n_dims, n_planes)
-            index.add(sites)
+            desired_bucket_size = 100
+            resulting_hash_length = math.floor(math.log2(len(sites) / desired_bucket_size))
+            index = lshashpy3.LSHash(resulting_hash_length, n_dims, 4)
+            for j in range(len(sites)):
+                # small trick to circumvent None-related errors...
+                index.index(sites[j], extra_data=int(j + 1))
             time_end = time.perf_counter()
             dt = round(time_end - time_start, 7)
             print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
@@ -109,9 +123,9 @@ def create_index(ds, sites, n_dims, n_planes):
             })
         case DS.HNSW:
             time_start = time.perf_counter()
-            index = faiss.IndexHNSWFlat(n_dims, 16)
-            index.hnsw.efConstruction = 128
-            index.add(sites)
+            index = hnswlib.Index(space='l2', dim=n_dims)
+            index.init_index(max_elements=len(sites), ef_construction=200, M=16)
+            index.add_items(sites)
             time_end = time.perf_counter()
             dt = round(time_end - time_start, 7)
             print(f'\tCreating HNSW Index: \t{time_end - time_start:.3f} seconds')
@@ -160,6 +174,21 @@ def create_index(ds, sites, n_dims, n_planes):
                 'event' : 'creation',
                 'dt' : dt
             })
+        case DS.BRUTE:
+            time_start = time.perf_counter()
+            random_sapmles = 0
+            index = hnswlib.BFIndex(space='l2', dim=n_dims)
+            index.init_index(max_elements=len(sites))
+            index.add_items(sites, range(len(sites)))
+            time_end = time.perf_counter()
+            dt = round(time_end - time_start, 7)
+            print(f'\tBruteforce: \t{time_end - time_start:.3f} seconds')
+            timings.append({
+                'instance' : i,
+                'algo' : to_string(ds),
+                'event' : 'creation',
+                'dt' : dt
+            })
 
     return (index, rand_samples)
 
@@ -168,10 +197,18 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
     match ds[0]:
         case DS.LSH:
             time_start = time.perf_counter()
+            index_solutions = []
+            for q in queries:
+                nn = index.query(q, num_results=k_i, distance_func='euclidean')
+                ids = []
+                for ((_, id), _) in nn:
+                    ids.append(id - 1)
+                index_solutions.append(ids)
+            index_solutions = np.asarray(index_solutions)
+            index_solutions.astype(np.intp, copy=False)
             time_end = time.perf_counter()
-            index_solutions = index.search(queries, k_i)[1]
             dt = round(time_end - time_start, 7)
-            #print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
+            print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
             timings.append({
                 'instance' : i,
                 'algo' : to_string(ds),
@@ -179,57 +216,83 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                 'dt' : dt / len(queries)
             })
         case DS.HNSW:
-            time_start = time.perf_counter()
-            index.hnsw.efSearch = 32
-            _, index_solutions = index.search(queries, k_i)
-            time_end = time.perf_counter()
-            dt = round(time_end - time_start, 7)
-            #print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
-            timings.append({
+            index.set_ef(200)
+            index_solutions = []
+            for q in queries:
+                time_start = time.perf_counter()
+                solutions, _ = index.knn_query(q, k_i)
+                time_end = time.perf_counter()
+                dt = round(time_end - time_start, 7)
+                timings.append({
+                        'instance' : i,
+                        'algo' : to_string(ds),
+                        'event' : 'query',
+                        'k' : k_i,
+                        'dt' : dt
+                })
+                index_solutions.append(solutions[0])
+                print(f'\tQuerying HNSW Index: \t{time_end - time_start:.3f} seconds')
+        case DS.KD:
+            index_solutions = []
+            for q in queries:
+                q = q.reshape(1, -1)
+                time_start = time.perf_counter()
+                solutions = rand_samples[index.query(q, k=k_i, return_distance=False)]
+                time_end = time.perf_counter()
+                dt = round(time_end - time_start, 7)
+                index_solutions.append(solutions[0])
+                timings.append({
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
-                    'k' : k_i,
-                    'dt' : dt / len(queries)
-            })
-        case DS.KD:
-            time_start = time.perf_counter()
-            index_solutions = rand_samples[index.query(queries, k=k_i, return_distance=False)]
-            time_end = time.perf_counter()
-            dt = round(time_end - time_start, 7)
-            #print(f'\tQuerying KD-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
-            timings.append({
-                'instance' : i,
-                'algo' : to_string(ds),
-                'event' : 'query',
-                'dt' : dt / len(queries)
-            })
+                    'dt' : dt
+                })
+                print(f'\tQuerying KD-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
         case DS.BT:
-            time_start = time.perf_counter()
-            index_solutions = rand_samples[index.query(queries, k=k_i, return_distance=False)]
-            time_end = time.perf_counter()
-            dt = round(time_end - time_start, 7)
-            #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
-            timings.append({
-                'instance' : i,
-                'algo' : to_string(ds),
-                'event' : 'query',
-                'dt' : dt / len(queries)
-            })
+            index_solutions = []
+            for q in queries:
+                q = q.reshape(1, -1)
+                time_start = time.perf_counter()
+                solutions = rand_samples[index.query(q, k=k_i, return_distance=False)]
+                time_end = time.perf_counter()
+                dt = round(time_end - time_start, 7)
+                index_solutions.append(solutions[0])
+                print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+                timings.append({
+                    'instance' : i,
+                    'algo' : to_string(ds),
+                    'event' : 'query',
+                    'dt' : dt
+                })
         case DS.RS:
-            time_start = time.perf_counter()
             index_solutions = []
             for _ in range(len(queries)):
+                time_start = time.perf_counter()
                 index_solutions.append(np.random.choice(len(sites), k_i, replace=False))
-            time_end = time.perf_counter()
-            dt = round(time_end - time_start, 7)
-            #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
-            timings.append({
-                'instance' : i,
-                'algo' : to_string(ds),
-                'event' : 'query',
-                'dt' : dt / len(queries)
-            })
+                time_end = time.perf_counter()
+                dt = round(time_end - time_start, 7)
+                print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+                timings.append({
+                    'instance' : i,
+                    'algo' : to_string(ds),
+                    'event' : 'query',
+                    'dt' : dt
+                })
+        case DS.BRUTE:
+            index_solutions = []
+            for q in queries:
+                time_start = time.perf_counter()
+                solutions, _ = index.knn_query(q, k_i)
+                time_end = time.perf_counter()
+                dt = round(time_end - time_start, 7)
+                index_solutions.append(solutions[0])
+                #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
+                timings.append({
+                    'instance' : i,
+                    'algo' : to_string(ds),
+                    'event' : 'query',
+                    'dt' : dt
+                })
     return index_solutions
 
 
@@ -268,7 +331,9 @@ for i in range(n_instances):
                         'instance' : i,
                         var_name : var_value,
                         'algo' : to_string(ds),
-                        'Quality' : float(solution_distances[q_idx] == sample_distances[q_idx]) if np.isnan(q) else q
+                        #nan occurs for division by zero, in which case the distance
+                        # to the solution is zero and the quality must be one.
+                        'Quality' : 1.0 if np.isnan(q) else q
                     })
 
             for sample_idx, neighbors in enumerate(index_solutions):
