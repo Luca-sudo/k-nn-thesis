@@ -35,7 +35,7 @@ n_sites = [10000 for i in range(len(spreads))]
 n_dims = [100 for i in range(len(spreads))]
 n_planes = [2 * dim for dim in n_dims]
 max_k = 100
-sample_size = 22
+sample_size = 30
 first_center = [3.0 for i in spreads]
 second_center = [first_center[i] + spreads[i] for i in range(len(spreads))]
 print(f'first_center: {first_center}')

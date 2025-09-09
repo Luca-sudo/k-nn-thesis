@@ -18,12 +18,12 @@ def invert(l):
 
 # Hypothesis 4: The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes.
 
-extent = 100
-n_dims = [2 for i in range(20)]
-n_planes = [i * n_dims[i] for i in range(len(n_dims))]
+extent = 2 ** 10
+n_dims = [2 for i in range(13)]
+n_planes = [2 ** (i + 2) for i in range(len(n_dims))]
 n_sites = [extent ** n_dims[i] for i in range(len(n_dims))]
 max_k = 100
-sample_size = 20
+sample_size = 30
 filepath = "data/hypothesis_4.h5"
 site_generator = lambda i: [(x,y) for x in range(extent) for y in range(extent)]
 query_generator = lambda i: np.random.uniform(0.0, extent, (sample_size, n_dims[i]))

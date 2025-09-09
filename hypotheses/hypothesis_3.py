@@ -34,7 +34,7 @@ n_sites = [(extents[i] ** 2) for i in range(len(extents))]
 n_dims = [2 for i in range(len(extents))]
 n_planes = [(2 * dim) for dim in n_dims]
 max_k = 100
-sample_size = 20
+sample_size = 30
 site_generator = lambda i: [(np.float64(x),np.float64(y)) for x in range(extents[i]) for y in range(extents[i])]
 query_generator = lambda i: np.random.uniform(0.0, extents[i] - 1.0, (sample_size, n_dims[i]))
 

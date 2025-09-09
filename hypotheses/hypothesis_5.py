@@ -19,12 +19,12 @@ def invert(l):
 
 # Hypothesis 5: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
 
-extent = 5
+extent = 10
 n_dims = [i for i in range(2, 10)]
 n_planes = [dim * 2 for dim in n_dims]
-n_sites = [5 ** dim for dim in n_dims]
+n_sites = [extent ** dim for dim in n_dims]
 max_k = 100
-sample_size = 20
+sample_size = 30
 site_generator = lambda i: [s for s in itertools.product(range(extent), repeat=n_dims[i])]
 query_generator = lambda i: np.random.uniform(0, extent, (sample_size, n_dims[i]))
 
