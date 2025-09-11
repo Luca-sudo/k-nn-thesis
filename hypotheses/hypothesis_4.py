@@ -18,7 +18,7 @@ def invert(l):
 
 # Hypothesis 4: The observed loss of quality in hypothesis 3 can /not/ be counteracted by increasing the number of separating hyperplanes.
 
-extent = 2 ** 10
+extent = 2 ** 7
 n_dims = [2 for i in range(13)]
 n_planes = [2 ** (i + 2) for i in range(len(n_dims))]
 n_sites = [extent ** n_dims[i] for i in range(len(n_dims))]

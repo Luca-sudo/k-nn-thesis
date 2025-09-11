@@ -29,7 +29,7 @@ To this extent, all sites have the form $(i, j)$ with $i, j \in \mathbb{N}$ and 
 np.random.seed(42)
 
 # Define all relevant data
-extents = [(2 ** i) for i in range(4, 15)]
+extents = [(2 ** i) for i in range(4, 10)]
 n_sites = [(extents[i] ** 2) for i in range(len(extents))]
 n_dims = [2 for i in range(len(extents))]
 n_planes = [(2 * dim) for dim in n_dims]

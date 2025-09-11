@@ -199,3 +199,4 @@ recalls.to_hdf(target_path + "_results.h5", key="recalls", format="table")
 results = h5py.File(target_path + "_results.h5", 'r+')
 
 results.attrs['var_name'] = file.attrs['var_name']
+results.attrs['var_values'] = file.attrs['var_values']
