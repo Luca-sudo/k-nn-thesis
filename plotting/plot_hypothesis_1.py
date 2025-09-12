@@ -44,9 +44,11 @@ var_values = results.attrs['var_values'][()]
 
 plot_path = "plots/" + filepath[5:]
 
+excluded_algos = ['bruteforce', 'kd@1.0', 'bt@1.0', 'rand sampling']
+
 fig, ax = plt.subplots()
 
-sns.lineplot(data=qualities, x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
+sns.lineplot(data=qualities[~qualities['algo'].isin(excluded_algos)], x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
 
 ax.set(xlabel=var_name)
 pos = range(len(var_values))
@@ -59,7 +61,7 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=ranks, x='algo', y='Rank', hue='instance', legend=False, fliersize=0)
+sns.boxplot(data=ranks[~ranks['algo'].isin(excluded_algos)], x='algo', y='Rank', hue='instance', legend=False, fliersize=0)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])
@@ -67,7 +69,7 @@ ax.set_xticklabels([])
 # Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
 colors = list(algo_to_color.values())
 for patch_idx, patch in enumerate(ax.patches):
-    patch.set_facecolor(colors[patch_idx % len(colors)])
+    patch.set_facecolor(colors[patch_idx % (len(colors) - len(excluded_algos))])
 
 plt.yscale('log', base=2)
 
@@ -109,7 +111,7 @@ plt.clf()
 
 fig, ax = plt.subplots()
 
-sns.boxplot(data=recalls, x='algo', y='Recall', hue='instance', legend=False, ax=ax, showfliers=False)
+sns.boxplot(data=recalls[~recalls['algo'].isin(excluded_algos)], x='algo', y='Recall', hue='instance', legend=False, ax=ax, showfliers=False)
 
 ax.set(xlabel='Instances per Algorithm')
 ax.set_xticklabels([])
@@ -117,12 +119,27 @@ ax.set_xticklabels([])
 # Hacky way of properly coloring the groups. Found nothing for this when searching docs and forums.
 colors = list(algo_to_color.values())
 for patch_idx, patch in enumerate(ax.patches):
-    patch.set_facecolor(colors[patch_idx % len(colors)])
+    patch.set_facecolor(colors[patch_idx % (len(colors) - len(excluded_algos))])
 
 plt.savefig(plot_path + "_recalls.pdf")
 
 plt.clf()
 
-sns.lineplot(data=recalls, x='k', y='Recall', hue='algo', palette=algo_to_color, legend=False)
+recalls['algo_instance'] = recalls['algo'] + '_' + recalls['instance'].astype(str)
+
+instance_to_marker = {
+    0 : ".",
+    1 : "v",
+    2 : "^",
+    3 : "s",
+    4 : "d",
+    5 : "h",
+    6 : "H",
+    7 : "<",
+    8 : ">"
+}
+
+
+sns.lineplot(data=recalls[recalls['algo'].isin(['hnsw', 'lsh'])], x='k', y='Recall', hue='algo', style='instance', palette=algo_to_color, markers=instance_to_marker, legend=False)
 
 plt.savefig(plot_path + "_recalls@.pdf")
