@@ -22,7 +22,8 @@ algo_to_color = {
     'bt@0.6' : '#ff7800',
     'bt@0.8' : '#cc6000',
     'bt@1.0' : '#994800',
-    'rand sampling' : '#2ca02c'
+    'rand sampling' : '#2ca02c',
+    'bruteforce' : '#DFF954'
 }
 
 if(len(sys.argv) <= 1):
