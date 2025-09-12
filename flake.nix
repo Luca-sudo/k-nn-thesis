@@ -25,7 +25,9 @@
 					tables
 				]; 
 				
-				venvDir = ".venv";
+				shellHook = ''
+					source ./.venv/bin/activate
+				'';
 
 			};
 
