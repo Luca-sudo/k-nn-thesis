@@ -20,7 +20,7 @@ if(len(sys.argv) <= 1):
 filepath = sys.argv[1]
 
 file = h5py.File(filepath, 'r')
-max_k = file.attrs['max_k']
+max_k = 110
 k = [i for i in range(10, max_k, 10)]
 n_instances = file.attrs['n_instances'].astype(int).tolist()
 n_sites = file.attrs['n_sites'].astype(int).tolist()
