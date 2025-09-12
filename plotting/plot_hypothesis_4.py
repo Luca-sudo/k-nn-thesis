@@ -37,6 +37,7 @@ timings = pd.read_hdf(filepath + "_results.h5", key="timings")
 ranks = pd.read_hdf(filepath + "_results.h5", key="ranks")
 recalls = pd.read_hdf(filepath + "_results.h5", key="recalls")
 previous_recalls = pd.read_hdf('data/hypothesis_3_results.h5', key='recalls')
+previous_qualities = pd.read_hdf('data/hypothesis_3_results.h5', key='qualities')
 
 results = h5py.File(filepath + "_results.h5", 'r')
 
@@ -47,12 +48,16 @@ plot_path = "plots/" + filepath[5:]
 
 fig, ax = plt.subplots()
 
-sns.lineplot(data=qualities, x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
+sns.lineplot(data=qualities[qualities['algo'] == 'lsh'], x='instance', y='Quality', hue='algo', palette=algo_to_color, legend=False)
 
 ax.set(xlabel=var_name)
 pos = range(len(var_values))
 labels = var_values
 plt.xticks(pos, labels)
+
+previous_lsh_mean = previous_qualities[(previous_qualities['algo'] == 'lsh') & (previous_qualities['instance'] == 5)]['Quality'].mean()
+
+plt.axhline(y=previous_lsh_mean,  color=previous_lsh_color['lsh'], linestyle='--')
 
 plt.savefig(plot_path + "_qualities.pdf")
 
@@ -132,7 +137,7 @@ sns.boxplot(data=recalls[recalls['algo'] == 'lsh'], x='k', y='Recall', hue='Nr. 
 for patch_idx, patch in enumerate(ax.patches):
     patch.set_facecolor(algo_to_color['lsh'])
 
-sns.pointplot(data=previous_recalls[previous_recalls['algo'].isin(['lsh'])], x='k', y='Recall', hue='algo', palette={'lsh' : '#F57374'}, legend=False, ax=ax)
+# sns.pointplot(data=previous_recalls[previous_recalls['algo'].isin(['lsh'])], x='k', y='Recall', hue='algo', palette={'lsh' : '#F57374'}, legend=False, ax=ax)
 
 plt.savefig(plot_path + "_recalls@.pdf")
 
