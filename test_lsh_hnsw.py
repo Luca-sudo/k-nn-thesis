@@ -38,29 +38,20 @@ qualities = []
 ranks = []
 recalls = []
 
-ef_search_factors = {
-    10 : 40,
-    20 : 20,
-    30 : 15,
-    40 : 10,
-    50 : 10,
-    60 : 10,
-    70 : 10,
-    80 : 10,
-    90 : 10,
-}
+# Widely used standard configurations in production systems.
+# Start of as optimized for performance and gradually trade-off for approximation quality.
+hnsw_configs = [
+    {'M': 16, 'ef_construction': 128, 'ef_search': 32},
+    {'M': 32, 'ef_construction': 128, 'ef_search': 128},
+    {'M': 128, 'ef_construction': 256, 'ef_search': 256}
+]
 
-k_search_factors = {
-    10 : 40,
-    20 : 20,
-    30 : 15,
-    40 : 10,
-    50 : 10,
-    60 : 10,
-    70 : 10,
-    80 : 10,
-    90 : 10,
-}
+annoy_configs = [
+    {'n_trees': 20, 'search_k_multiplier': 1},
+    {'n_trees': 50, 'search_k_multiplier': 2},
+    {'n_trees': 100, 'search_k_multiplier': 4}
+]
+
 
 class DS(Enum):
     LSH = 1
@@ -76,11 +67,11 @@ def BT(sample_size):
 def KD(sample_size):
     return (DS.KD, sample_size)
 
-def HNSW(sample_size):
-    return (DS.HNSW, sample_size)
+def HNSW(config_idx):
+    return (DS.HNSW, config_idx)
 
-def LSH(sample_size):
-    return (DS.LSH, sample_size)
+def LSH(config_idx):
+    return (DS.LSH, config_idx)
 
 # Sample size doesnt matter for random sampling.
 def RS(sample_size):
@@ -105,8 +96,8 @@ def to_string(ds):
             return 'bruteforce'
 
 ds_to_test = [
-    LSH(1.0),
-    HNSW(1.0),
+    LSH(2),
+    HNSW(2),
     KD(0.2),
     KD(0.4),
     KD(0.6),
@@ -121,18 +112,19 @@ ds_to_test = [
     BRUTE(1.0)
 ]
 
-def create_index(ds, sites, n_dims, n_planes):
+def create_index(ds, sites, n_dims):
     # Maximum number of samples is hardcoded. Relevant for DS.RS
     MAX_SAMPLES = 100
     index = 0
     rand_samples = 0
     match ds[0]:
         case DS.LSH:
+            parameters = annoy_configs[ds[1]]
             time_start = time.perf_counter()
             index = AnnoyIndex(n_dims, 'euclidean')
             for j in range(len(sites)):
                 index.add_item(j, sites[j])
-            index.build(50)
+            index.build(parameters['n_trees'])
             time_end = time.perf_counter()
             dt = round(time_end - time_start, 7)
             print(f'\tCreating LSH Index: \t{time_end - time_start:.3f} seconds')
@@ -144,8 +136,9 @@ def create_index(ds, sites, n_dims, n_planes):
             })
         case DS.HNSW:
             time_start = time.perf_counter()
+            parameters = hnsw_configs[ds[1]]
             index = hnswlib.Index(space='l2', dim=n_dims)
-            index.init_index(max_elements=len(sites), ef_construction=200, M=16)
+            index.init_index(max_elements=len(sites), ef_construction=parameters['ef_construction'], M=parameters['M'])
             index.add_items(sites)
             time_end = time.perf_counter()
             dt = round(time_end - time_start, 7)
@@ -217,12 +210,13 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
     index_solutions = 0
     match ds[0]:
         case DS.LSH:
+            parameters = annoy_configs[ds[1]]
             index_solutions = []
             for q in queries:
                 time_start = time.perf_counter()
-                index_solutions.append(index.get_nns_by_vector(q, k_i, search_k= 7000))
+                index_solutions.append(index.get_nns_by_vector(q, k_i, search_k= (parameters['search_k_multiplier'] * index.get_n_trees() * k_i)))
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 #print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
                 timings.append({
                     'instance' : i,
@@ -233,13 +227,14 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
             index_solutions = np.asarray(index_solutions)
             index_solutions.astype(np.intp, copy=False)
         case DS.HNSW:
-            index.set_ef(700)
+            parameters = hnsw_configs[ds[1]]
+            index.set_ef(parameters['ef_search'])
             index_solutions = []
             for q in queries:
                 time_start = time.perf_counter()
                 solutions, _ = index.knn_query(q, k_i)
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 timings.append({
                         'instance' : i,
                         'algo' : to_string(ds),
@@ -256,7 +251,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                 time_start = time.perf_counter()
                 solutions = rand_samples[index.query(q, k=k_i, return_distance=False)]
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 index_solutions.append(solutions[0])
                 timings.append({
                     'instance' : i,
@@ -272,7 +267,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                 time_start = time.perf_counter()
                 solutions = rand_samples[index.query(q, k=k_i, return_distance=False)]
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 index_solutions.append(solutions[0])
                 #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
                 timings.append({
@@ -287,7 +282,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                 time_start = time.perf_counter()
                 index_solutions.append(np.random.choice(len(sites), k_i, replace=False))
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
                 timings.append({
                     'instance' : i,
@@ -301,7 +296,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                 time_start = time.perf_counter()
                 solutions, _ = index.knn_query(q, k_i)
                 time_end = time.perf_counter()
-                dt = round(time_end - time_start, 7)
+                dt = time_end - time_start
                 index_solutions.append(solutions[0])
                 #print(f'\tQuerying Ball-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
                 timings.append({
@@ -332,12 +327,9 @@ for i in range(n_instances):
     print(f'\tExtracting data: \t{dt:.3f} seconds')
 
     for ds in ds_to_test:
-        (index, rand_sample) = create_index(ds, sites, n_dims[i], n_planes[i])
+        (index, rand_sample) = create_index(ds, sites, n_dims[i])
 
         for k_i in k:
-            # Have less than k_i overall sites => skip
-            if len(sites) * ds[1] <= k_i:
-                continue
             index_solutions = search_index(index, ds, rand_sample, queries, k_i, i)
             for sample_idx in range(sample_size):
                 solution_distances = site_to_distance[sample_idx][solution[sample_idx][:k_i]]
