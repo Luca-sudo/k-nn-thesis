@@ -42,7 +42,7 @@ result = result.reset_index()
 result = result[['degradation_hnsw', 'degradation_lsh']].T
 result = result.rename(lambda x: str(int(x) * 10 + 10), axis='columns')
 print('\nFor fixed values of k, calculate the recall degradation from first to last instance, computed as the fraction of achieved recalls.')
-print(result)
+print(tabulate(result, headers='keys'))
 
 creation_delta = c_times.pivot(index='algo', columns='instance', values='dt')
 creation_delta.loc['fractional difference'] = creation_delta.loc['hnsw'] / creation_delta.loc['lsh']
@@ -53,3 +53,5 @@ query_delta = q_times.groupby(['algo', 'instance']).agg(MeanDelta=("dt", "mean")
 query_delta.loc['fractional difference'] = query_delta.loc['hnsw'] / query_delta.loc['lsh']
 print('\nCalculate the mean time for queries over each instance, and compare fractionally.')
 print(query_delta)
+
+print(r[(r['algo'] == 'hnsw') & r['instance'] == 0].groupby(['instance'])[['instance', 'Recall']].mean())
