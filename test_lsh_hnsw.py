@@ -222,6 +222,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
+                    'k' : k_i,
                     'dt' : dt
                 })
             index_solutions = np.asarray(index_solutions)
@@ -257,6 +258,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
+                    'k' : k_i,
                     'dt' : dt
                 })
                 #print(f'\tQuerying KD-Tree@{ds[1]} Index: \t{time_end - time_start:.3f} seconds')
@@ -274,6 +276,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
+                    'k' : k_i,
                     'dt' : dt
                 })
         case DS.RS:
@@ -288,6 +291,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
+                    'k' : k_i,
                     'dt' : dt
                 })
         case DS.BRUTE:
@@ -303,6 +307,7 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
                     'instance' : i,
                     'algo' : to_string(ds),
                     'event' : 'query',
+                    'k' : k_i,
                     'dt' : dt
                 })
     return index_solutions
