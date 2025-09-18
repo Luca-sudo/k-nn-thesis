@@ -4,6 +4,7 @@ import numpy as np
 import h5py
 import faiss
 import sys
+import itertools
 from scipy.stats import vonmises_fisher as vf
 from scipy.stats import uniform_direction
 
@@ -22,18 +23,21 @@ np.random.seed(42)
 
 # Hypothesis 9: Local Intrinsic Dimensionality degrades both HNSW and LSH
 
-lid = 20
-kappa = [1, 5, 20, 50, 100, 200]
-mean_vec = [0 for _ in range(lid)]
-mean_vec[0] = 1.0
-n_sites = [100000 for _ in kappa]
+lids = [5, 30, 50, 70, 90]
+kappas = [1, 5, 50, 500]
+n_sites = [100000 for _ in range(len(lids) * len(kappas))]
 n_dims = [100 for i in n_sites]
 n_planes = [dim * 2 for dim in n_dims]
 max_k = 100
 sample_size = 30
 filepath = "data/hypothesis_11.h5"
-site_generator = lambda i: np.asarray(list(map(lambda x: np.pad(x, (0, 100 - lid), 'constant'), vf(mean_vec, kappa[i]).rvs(n_sites[i]))))
-query_generator = lambda i: np.asarray(list(map(lambda x: np.pad(x, (0, 100 - lid), 'constant'), uniform_direction(lid).rvs(sample_size))))
+def site_generator(lid, kappa):
+    mean_vec = [0 for _ in range(lid)]
+    mean_vec[0] = 1.0
+    return np.asarray(list(map(lambda x: np.pad(x, (0, 100 - lid), 'constant'), vf(mean_vec, kappa).rvs(n_sites[0]))))
+
+def query_generator(lid):
+    return np.asarray(list(map(lambda x: np.pad(x, (0, 100 - lid), 'constant'), uniform_direction(lid).rvs(sample_size))))
 
 
 hypothesis = "Skewed distributions affect LSH more negatively for even moderate LID."
@@ -53,15 +57,15 @@ file.attrs['description'] = description
 file.attrs['hypothesis'] = hypothesis
 file.attrs['sample_size'] = sample_size
 
-for i in range(len(n_sites)):
-    print(f'Generating instance {i}:')
+for i, (lid, kappa) in enumerate(itertools.product(lids, kappas)):
+    print(f'Generating instance {i}, with LID={lid} & Kappa={kappa}')
     time_start = time.perf_counter()
-    sites = site_generator(i)
+    sites = site_generator(lid, kappa)
     sites = np.array(sites, dtype=np.float32)
     print(f'sites: {sites}')
     time_end = time.perf_counter()
     print(f'\tGenerating sites: {time_end - time_start:.3f} seconds')
-    queries = query_generator(i)
+    queries = query_generator(lid)
     time_start = time.perf_counter()
     index = faiss.IndexFlatL2(n_dims[i])
     index.add(sites)
@@ -97,5 +101,5 @@ for i in range(len(n_sites)):
     file.create_dataset('ranks_' + str(i), data = ranks)
     file.create_dataset('distance_' + str(i), data=site_to_distance)
 
-file.attrs['var_name'] = "Nr. of Sites"
-file.attrs['var_values'] = n_sites
+file.attrs['var_name'] = "(Lid, Kappa)"
+file.attrs['var_values'] = list(itertools.product(lids, kappas))
