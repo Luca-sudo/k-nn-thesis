@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import math
@@ -47,8 +48,7 @@ annoy_configs = [
     {'n_trees': 100, 'search_k_multiplier': 0.2},
     {'n_trees': 100, 'search_k_multiplier': 0.4},
     {'n_trees': 100, 'search_k_multiplier': 0.6},
-    {'n_trees': 100, 'search_k_multiplier': 0.8},
-    {'n_trees': 100, 'search_k_multiplier': 1.0}
+    {'n_trees': 100, 'search_k_multiplier': 0.8}
 ]
 
 
@@ -95,11 +95,7 @@ def to_string(ds):
             return 'bruteforce'
 
 ds_to_test = [
-    LSH(0),
-    LSH(1),
-    LSH(2),
-    LSH(3),
-    LSH(4)
+    LSH(0)
 ]
 
 def create_index(ds, sites, n_dims):
@@ -196,7 +192,7 @@ def create_index(ds, sites, n_dims):
 
     return (index, rand_samples)
 
-def search_index(index, ds, rand_samples, queries, k_i, instance_num):
+def search_index(index, ds, rand_samples, queries, k_i, instance_num, lsh_counter):
     index_solutions = 0
     match ds[0]:
         case DS.LSH:
@@ -204,14 +200,14 @@ def search_index(index, ds, rand_samples, queries, k_i, instance_num):
             index_solutions = []
             for q in queries:
                 time_start = time.perf_counter()
-                index_solutions.append(index.get_nns_by_vector(q, k_i, search_k= int(parameters['search_k_multiplier'] * index.get_n_items())))
+                index_solutions.append(index.get_nns_by_vector(q, k_i, search_k= int(annoy_configs[lsh_counter]['search_k_multiplier'] * index.get_n_items())))
                 time_end = time.perf_counter()
                 dt = time_end - time_start
                 #print(f'\tQuerying LSH Index: \t{time_end - time_start:.3f} seconds')
                 timings.append({
                     'instance' : i,
                     'algo' : to_string(ds),
-                    'sample_rate' : parameters['search_k_multiplier'],
+                    'sample_rate' : annoy_configs[lsh_counter]['search_k_multiplier'],
                     'event' : 'query',
                     'k' : k_i,
                     'dt' : dt
@@ -325,45 +321,41 @@ for i in range(n_instances):
     for ds in ds_to_test:
         (index, rand_sample) = create_index(ds, sites, n_dims[i])
 
-        for k_i in k:
-            index_solutions = search_index(index, ds, rand_sample, queries, k_i, i)
-            for sample_idx in range(sample_size):
-                solution_distances = site_to_distance[sample_idx][solution[sample_idx][:k_i]]
-                sample_distances = sorted(site_to_distance[sample_idx][index_solutions[sample_idx][:k_i]])
-                sample_qualities = solution_distances / sample_distances
-                for q in sample_qualities:
-                    qualities.append({
-                        'instance' : i,
-                        var_name : var_value,
-                        'algo' : to_string(ds),
-                        #nan occurs for division by zero, in which case the distance
-                        # to the solution is zero and the quality must be one.
-                        'Quality' : 1.0 if np.isnan(q) else q
-                    })
+        if(ds[0] == DS.LSH):
+            for lsh_counter in range(len(annoy_configs)):
+                for k_i in k:
+                    index_solutions = search_index(index, ds, rand_sample, queries, k_i, i, lsh_counter)
 
-            for sample_idx, neighbors in enumerate(index_solutions):
-                    for r in site_to_rank[sample_idx][neighbors]:
-                            ranks.append({
+                    for sample_idx, neighbors in enumerate(index_solutions):
+                            neighbor_count = 0
+                            for r in site_to_rank[sample_idx][neighbors]:
+                                    if r <= k_i:
+                                            neighbor_count += 1
+                            recalls.append({
                                     'instance' : i,
                                     var_name : var_value,
                                     'algo' : to_string(ds),
-                                    'Rank' : r
+                                    'sample_rate' : annoy_configs[lsh_counter]['search_k_multiplier'],
+                                    'Recall' : neighbor_count / k_i,
+                                    'k' : k_i
                             })
+        else:
+            for k_i in k:
+                index_solutions = search_index(index, ds, rand_sample, queries, k_i, i, 0)
+                for sample_idx, neighbors in enumerate(index_solutions):
+                        neighbor_count = 0
+                        for r in site_to_rank[sample_idx][neighbors]:
+                                if r <= k_i:
+                                        neighbor_count += 1
+                        recalls.append({
+                                'instance' : i,
+                                var_name : var_value,
+                                'algo' : to_string(ds),
+                                'sample_rate' : ds[1],
+                                'Recall' : neighbor_count / k_i,
+                                'k' : k_i
+                        })
 
-
-            for sample_idx, neighbors in enumerate(index_solutions):
-                    neighbor_count = 0
-                    for r in site_to_rank[sample_idx][neighbors]:
-                            if r <= k_i:
-                                    neighbor_count += 1
-                    recalls.append({
-                            'instance' : i,
-                            var_name : var_value,
-                            'algo' : to_string(ds),
-                            'sample_rate' : annoy_configs[ds[1]]['search_k_multiplier'],
-                            'Recall' : neighbor_count / k_i,
-                            'k' : k_i
-                    })
 
 
 timings = pd.DataFrame(timings)
