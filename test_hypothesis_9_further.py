@@ -94,15 +94,7 @@ def to_string(ds):
             return 'bruteforce'
 
 ds_to_test = [
-    LSH(0),
-    KD(0.2),
-    KD(0.4),
-    KD(0.6),
-    KD(0.8),
-    BT(0.2),
-    BT(0.4),
-    BT(0.6),
-    BT(0.8)
+    LSH(0)
 ]
 
 def create_index(ds, sites, n_dims):
@@ -342,7 +334,7 @@ for i in range(n_instances):
                                     'instance' : i,
                                     var_name : var_value,
                                     'algo' : to_string(ds),
-                                    'sample_rate' : annoy_configs[ds[1]]['search_k_multiplier'],
+                                    'sample_rate' : annoy_configs[lsh_counter]['search_k_multiplier'],
                                     'Recall' : neighbor_count / k_i,
                                     'k' : k_i
                             })
