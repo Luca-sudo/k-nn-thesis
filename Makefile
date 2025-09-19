@@ -19,6 +19,12 @@ generate_%: hypotheses/%.py
 	@mkdir -p data
 	python3 $^
 
+additional_test_%: stats/test_hypothesis_%_further.py
+	python3 $<
+
+additional_stats_%: stats/hypothesis_%_further.py
+	python3 $<
+
 test_hypothesis_%: data/hypothesis_%.h5
 	@mkdir -p evaluation
 	python3 test_lsh_hnsw.py $<
@@ -32,8 +38,8 @@ test_gist1m: data/gist1m.h5
 plot_hypothesis_%: plotting/plot_hypothesis_%.py data/hypothesis_%_results.h5
 	python3 $^
 
-stats_%: data/%.h5
-	python3 compute_statistics.py $<
+stats_hypothesis_%: stats/hypothesis_%.py
+	python3 $<
 
 .PHONY: clean
 
