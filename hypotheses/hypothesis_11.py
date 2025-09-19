@@ -43,7 +43,6 @@ def query_generator(lid):
 hypothesis = "Skewed distributions affect LSH more negatively for even moderate LID."
 
 description = """
-All instances generate sites on the 20-dimensional sphere. Successive instances increase the skewedness; how disparately points are distributed across the sphere.
 """
 
 
