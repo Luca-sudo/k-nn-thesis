@@ -19,8 +19,8 @@ def invert(l):
 
 # Hypothesis 5: Over a uniform-grid similar to hypotheses 3 & 4, the quality of LSH diminishes as the dimensionality of the feature space increases over a bounded region.
 
-extent = 10
-n_dims = [i for i in range(2, 10)]
+extent = 20
+n_dims = [i for i in range(2, 6)]
 n_planes = [dim * 2 for dim in n_dims]
 n_sites = [extent ** dim for dim in n_dims]
 max_k = 100
