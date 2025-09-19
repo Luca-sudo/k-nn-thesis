@@ -30,7 +30,7 @@ n_dims = [100 for i in n_sites]
 n_planes = [dim * 2 for dim in n_dims]
 max_k = 100
 sample_size = 30
-filepath = "data/hypothesis_11_further.h5"
+filepath = "data/hypothesis_11_2.h5"
 def site_generator(lid, kappa):
     mean_vec = [0 for _ in range(lid)]
     mean_vec[0] = 1.0
